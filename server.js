@@ -8,6 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
 // ? EXPRESS
 const express = require("express");
 const app = express();
+const compression = require('compression');
 // ? MONGOOSE
 const mongoose = require('mongoose');
 // ? PASSPORT and SESSION
@@ -31,7 +32,7 @@ const allowCrossDomain = function (req, res, next) {
   next();
 }
 
-
+app.use(compression());
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
