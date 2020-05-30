@@ -19,6 +19,7 @@ const https = require("https");
 const http = require("http");
 const fs = require("fs");
 
+
 // ? PASSPORT CONFIG
 require('./config/passport')(passport);
 
@@ -29,7 +30,7 @@ const allowCrossDomain = function (req, res, next) {
   res.header('Access-Control-Allow-Headers', '*');
   next();
 }
-app.use(allowCrossDomain)
+
 
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
@@ -76,13 +77,16 @@ db.once("open", () => console.log("Connected to Mongoose"));
 
 const PORT = process.env.PORT || 3000;
 
-const server = https.createServer({
+const server = http.Server(app);
 
-  key: fs.readFileSync("./ssl/playgomoku.com.key"),
-  ca: fs.readFileSync("./ssl/playgomoku_com.ca-bundle"),
-  cert: fs.readFileSync("./ssl/playgomoku_com.crt")
+// const server = https.createServer({
 
-}, app);
+//   key: fs.readFileSync("./ssl/playgomoku.com.key"),
+//   ca: fs.readFileSync("./ssl/playgomoku_com.ca-bundle"),
+//   cert: fs.readFileSync("./ssl/playgomoku_com.crt"),
+//   requestCert: false,
+//   rejectUnauthorized: false
+// }, app);
 
 server.listen(PORT);
 
