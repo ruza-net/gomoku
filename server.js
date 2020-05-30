@@ -76,14 +76,14 @@ db.once("open", () => console.log("Connected to Mongoose"));
 
 const PORT = process.env.PORT || 3000;
 
-// const secureServer = https.createServer({
+const server = https.createServer({
 
-//   key: fs.readFileSync("./ssl/playgomoku.com.key"),
-//   ca: fs.readFileSync("./ssl/playgomoku_com.ca-bundle"),
-//   cert: fs.readFileSync("./ssl/playgomoku_com.crt")
+  key: fs.readFileSync("./ssl/playgomoku.com.key"),
+  ca: fs.readFileSync("./ssl/playgomoku_com.ca-bundle"),
+  cert: fs.readFileSync("./ssl/playgomoku_com.crt")
 
-// }, app);
-const server = http.Server(app);
+}, app);
+
 server.listen(PORT);
 
 const gamesObject = {};
