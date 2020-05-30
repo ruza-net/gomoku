@@ -15,7 +15,9 @@ const passport = require("passport");
 const session = require("express-session");
 // ? SOCKET.IO + HTTP
 const socketIO = require("socket.io");
+const https = require("https");
 const http = require("http");
+const fs = require("fs");
 
 // ? PASSPORT CONFIG
 require('./config/passport')(passport);
@@ -74,6 +76,13 @@ db.once("open", () => console.log("Connected to Mongoose"));
 
 const PORT = process.env.PORT || 3000;
 
+// const secureServer = https.createServer({
+
+//   key: fs.readFileSync("./ssl/playgomoku.com.key"),
+//   ca: fs.readFileSync("./ssl/playgomoku_com.ca-bundle"),
+//   cert: fs.readFileSync("./ssl/playgomoku_com.crt")
+
+// }, app);
 const server = http.Server(app);
 server.listen(PORT);
 
@@ -90,7 +99,7 @@ const gamesObject = {
   }
 }
 */
-const io = socketIO(server);
+const io = socketIO(server, { origins: '*:*' });
 const playersQue = [];
 
 const gamePlan = () => {
