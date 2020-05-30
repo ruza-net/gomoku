@@ -32,7 +32,7 @@ const allowCrossDomain = function (req, res, next) {
   next();
 }
 
-app.use(compression());
+
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
@@ -55,6 +55,7 @@ app.use(passport.session());
 const indexRouter = require("./routes/index");
 app.use("/api/", indexRouter);
 
+app.use(compression());
 if (process.env.NODE_ENV === "production") {
   //Static folder
   app.use(express.static(__dirname + "/public/"));
