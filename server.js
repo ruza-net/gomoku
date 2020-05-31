@@ -16,9 +16,7 @@ const passport = require("passport");
 const session = require("express-session");
 // ? SOCKET.IO + HTTP
 const socketIO = require("socket.io");
-const https = require("https");
 const http = require("http");
-const fs = require("fs");
 
 
 // ? PASSPORT CONFIG
@@ -32,6 +30,7 @@ const allowCrossDomain = function (req, res, next) {
   next();
 }
 
+app.use(allowCrossDomain);
 
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
@@ -122,7 +121,6 @@ const gamePlan = () => {
 // ? Managing Socket.IO instances
 io.on('connection', function (socket) {
   // ? Give client set of existing rooms
-  console.log("connected");
   playersQue.push(socket.id);
   if (playersQue.length >= 2) {
     let roomID = genID(gamesObject);
@@ -144,8 +142,6 @@ io.on('connection', function (socket) {
   socket.on("gameJoined", function (roomID) {
     if (!gamesObject.hasOwnProperty(roomID)) {
       socket.emit("roomMissing");
-      console.log(roomID);
-      console.log(gamesObject);
     } else {
       socket.join(roomID);
       gamesObject[roomID].players.push(socket.id);
@@ -249,7 +245,6 @@ io.on('connection', function (socket) {
   });
 
   socket.on('disconnect', function () {
-    console.log("disconnected");
     let indexOfSocket = playersQue.indexOf(socket.id);
     playersQue.splice(indexOfSocket, 1);
   })

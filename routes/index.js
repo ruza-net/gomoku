@@ -34,13 +34,11 @@ router.post("/register", (req, res) => {
     User.findOne({ username: username }).then(user => {
 
       if (user) {
-        console.log("Username is already taken.");
         res.status(500).send("Username is already taken");
       } else {
         User.findOne({ email: email }).then(userEmail => {
 
           if (userEmail) {
-            console.log("Email is already taken.");
             res.status(500).send("Email is already taken");
           } else {
             const newUser = new User({
@@ -57,7 +55,6 @@ router.post("/register", (req, res) => {
                 // Set password to hashed
                 newUser.password = hash;
                 // Save user
-                console.log("registered")
                 newUser
                   .save()
                   .then(user => {
@@ -78,11 +75,10 @@ router.post('/login',
   function (req, res) {
     // If this function gets called, authentication was successful.
     // `req.user` contains the authenticated user.
-    console.log("success");
     res.status(200).send("");
   });
 
-router.post('/isLogged', (req, res) => {
+router.post('/islogged', (req, res) => {
   if (req.user) {
     res.status(200).send(req.user);
   } else {
