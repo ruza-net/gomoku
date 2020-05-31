@@ -80,31 +80,11 @@ const PORT = process.env.PORT || 3000;
 
 const server = http.Server(app);
 
-// const server = https.createServer({
-
-//   key: fs.readFileSync("./ssl/playgomoku.com.key"),
-//   ca: fs.readFileSync("./ssl/playgomoku_com.ca-bundle"),
-//   cert: fs.readFileSync("./ssl/playgomoku_com.crt"),
-//   requestCert: false,
-//   rejectUnauthorized: false
-// }, app);
-
 server.listen(PORT);
 
 const gamesObject = {};
-/*
-const gamesObject = {
-  234gsadf3(gameID): {
-    players: [],
-    round: 0,
-    time0: 300,
-    time1: 300,
-    timestamp: "",
-    gamePlan: []
-  }
-}
-*/
-const io = socketIO(server, { origins: '*:*' });
+
+const io = socketIO(server, { origins: '*:*', cookie: false });
 const playersQue = [];
 
 const gamePlan = () => {
