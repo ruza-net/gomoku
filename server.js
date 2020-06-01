@@ -114,8 +114,10 @@ io.on('connection', function (socket) {
       won: true,
       gamePlan: gamePlan()
     };
+
     io.to(playersQue[0]).emit('gameCreated', roomID);
     io.to(playersQue[1]).emit('gameCreated', roomID);
+
     playersQue.splice(0, 2);
   }
 
