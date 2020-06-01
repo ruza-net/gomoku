@@ -52,12 +52,11 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // ? ROUTES
+const apiRouter = require("./routes/api");
 const indexRouter = require("./routes/index");
-app.use("/api/", indexRouter);
+app.use("/api/", apiRouter);
+app.use("/", indexRouter);
 
-app.post("/port", function (req, res) {
-  res.status(200).send(process.env.PORT);
-});
 
 app.use(compression());
 if (process.env.NODE_ENV === "production") {
