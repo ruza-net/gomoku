@@ -31,8 +31,8 @@ const allowCrossDomain = function (req, res, next) {
   next();
 }
 
-app.use(allowCrossDomain);
-// app.use(cors);
+// app.use(allowCrossDomain);
+app.use(cors);
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
@@ -77,7 +77,7 @@ const db = mongoose.connection;
 db.on("error", error => console.error(error));
 db.once("open", () => console.log("Connected to Mongoose"));
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 const server = http.Server(app);
 
@@ -100,7 +100,7 @@ const gamePlan = () => {
 };
 
 // ? Managing Socket.IO instances
-io.on('connection', function (socket) {
+io.on('connect', function (socket) {
   // ? Give client set of existing rooms
   playersQue.push(socket.id);
   if (playersQue.length >= 2) {
