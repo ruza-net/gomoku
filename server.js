@@ -55,6 +55,10 @@ app.use(passport.session());
 const indexRouter = require("./routes/index");
 app.use("/api/", indexRouter);
 
+app.post("/port", function (req, res) {
+  res.status(200).send(process.env.PORT);
+});
+
 app.use(compression());
 if (process.env.NODE_ENV === "production") {
   //Static folder
@@ -77,7 +81,7 @@ const db = mongoose.connection;
 db.on("error", error => console.error(error));
 db.once("open", () => console.log("Connected to Mongoose"));
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const server = http.Server(app);
 
