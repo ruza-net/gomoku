@@ -31,8 +31,8 @@ const allowCrossDomain = function (req, res, next) {
   next();
 }
 
-// app.use(allowCrossDomain);
-app.use(cors);
+app.use(allowCrossDomain);
+// app.use(cors);
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
