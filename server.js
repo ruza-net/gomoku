@@ -14,6 +14,7 @@ const mongoose = require('mongoose');
 // ? PASSPORT and SESSION
 const passport = require("passport");
 const session = require("express-session");
+const cors = require("cors");
 // ? SOCKET.IO + HTTP
 const socketIO = require("socket.io");
 const http = require("http");
@@ -31,7 +32,7 @@ const allowCrossDomain = function (req, res, next) {
 }
 
 app.use(allowCrossDomain);
-
+// app.use(cors);
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
