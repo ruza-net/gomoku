@@ -74,8 +74,8 @@ const PORT = process.env.PORT || 3000;
 
 const server = http.Server(app);
 
-// , { origins: '*:*', cookie: false }
-const io = socketIO(server);
+// , { origins: '*:*', 
+const io = socketIO(server, { cookie: false });
 server.listen(PORT);
 
 const gamesObject = {};
@@ -126,19 +126,14 @@ io.on('connection', function (socket) {
         gamesObject[roomID].first = rndN;
         io.to(roomID).emit("gameBegun", gamesObject[roomID].players[rndN]);
         setTimeout(() => {
-          io.to(roomID).emit("startTimer", gamesObject[roomID].players[rndN]);
           gamesObject[roomID].won = false;
         }, 3000)
       }
     }
   });
 
-  socket.on("gameClick", function (row, column) {
-
-  });
-
   socket.on("game click", function (roomID, xPos, yPos) {
-    const round = gamesObject[roomID].round;
+    const round = (gamesObject[roomID].round) + (gamesObject[roomID].first);
     const playersArr = gamesObject[roomID].players;
     const won = gamesObject[roomID].won;
     const gamePlan = gamesObject[roomID].gamePlan;
@@ -148,23 +143,22 @@ io.on('connection', function (socket) {
 
       gamesObject[roomID].gamePlan[xPos][yPos] = (round % 2) ? "1" : "2";
 
+
+      // IMPLEMENT LINES
+      if (checkWin(gamesObject[roomID].gamePlan, yPos, xPos, round) != false) {
+        io.to(roomID).emit("win", socket.id);
+        gamesObject[roomID].win = true;
+      }
+
       gamesObject[roomID].round++;
 
       io.to(roomID).emit('click success', socket.id, round, xPos, yPos);
-
-      // Check if won
-      // if (checkWin(gamePlan, data.id, round, playersArr)) {
-      //   runningGames[roomID].won = true;
-      //   io.to(roomID).emit("won", checkWin(gamePlan, data.id, round, playersArr), round);
-      // }
-
     } else {
     }
 
-    function checkWin(gamePlan, lastPos, round, playersArr) {
+
+    function checkWin(gamePlan, yPos, xPos, round) {
       const tile = (round % 2) ? "1" : "2";
-      const yPos = +lastPos.split(":")[0];
-      const xPos = +lastPos.split(":")[1];
 
       let horizont = 0;
       let vertical = 0;
@@ -205,12 +199,12 @@ io.on('connection', function (socket) {
           }
         }
         if (horizont >= 5 || vertical >= 5 || diagonalL >= 5 || diagonalR >= 5) {
-          return (playersArr[round % 2] + " has won");
+          return "win";
         }
       }
 
       if (horizont >= 5 || vertical >= 5 || diagonalL >= 5 || diagonalR >= 5) {
-        return (playersArr[round % 2] + " has won");
+        return "win";
       } else if (round === 225) {
         return "tie";
       } else {
