@@ -32,7 +32,7 @@ require('./config/passport')(passport);
 // }
 
 // app.use(allowCrossDomain);
-app.use(cors());
+// app.use(cors());
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
@@ -58,8 +58,8 @@ app.use("/api/", apiRouter);
 app.use("/", indexRouter);
 
 
-app.use(compression());
-if (process.env.NODE_ENV === "production") {
+// app.use(compression());
+if (process.env.NODE_ENV === "production" || true) {
   //Static folder
   app.use(express.static(__dirname + "/public/"));
 
@@ -84,11 +84,11 @@ const PORT = process.env.PORT || 3000;
 
 const server = http.Server(app);
 
+// , { origins: '*:*', cookie: false }
+const io = socketIO(server);
 server.listen(PORT);
 
 const gamesObject = {};
-
-const io = socketIO(server, { origins: '*:*', cookie: false });
 const playersQue = [];
 
 const gamePlan = () => {
@@ -103,7 +103,7 @@ const gamePlan = () => {
 };
 
 // ? Managing Socket.IO instances
-io.on('connect', function (socket) {
+io.on('connection', function (socket) {
   // ? Give client set of existing rooms
   playersQue.push(socket.id);
   if (playersQue.length >= 2) {
