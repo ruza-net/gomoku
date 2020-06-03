@@ -23,16 +23,6 @@ const http = require("http");
 // ? PASSPORT CONFIG
 require('./config/passport')(passport);
 
-// CORS middleware
-// const allowCrossDomain = function (req, res, next) {
-//   res.header('Access-Control-Allow-Origin', '*');
-//   res.header('Access-Control-Allow-Methods', '*');
-//   res.header('Access-Control-Allow-Headers', '*');
-//   next();
-// }
-
-// app.use(allowCrossDomain);
-// app.use(cors());
 // ? EXPRESS BODYPARSER
 app.use(express.json());       // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
