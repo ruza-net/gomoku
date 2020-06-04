@@ -94,6 +94,7 @@ const gamePlan = () => {
 
 // ? Managing Socket.IO instances
 io.on('connection', function (socket) {
+  console.log(playersQue);
   // ? Give client set of existing rooms
   playersQue.push(socket.id);
   if (playersQue.length >= 2) {
@@ -115,20 +116,24 @@ io.on('connection', function (socket) {
     playersQue.splice(0, 2);
   }
 
+  console.log(playersQue);
+
+
   socket.on("gameJoined", function (roomID) {
     if (!gamesObject.hasOwnProperty(roomID)) {
       socket.emit("roomMissing");
-    } else {
+    } else if (gamesObject[roomID].players.length < 2) {
       socket.join(roomID);
       gamesObject[roomID].players.push(socket.id);
-      if (gamesObject[roomID].players.length >= 2) {
-        let rndN = Math.round(Math.random());
-        gamesObject[roomID].first = rndN;
-        io.to(roomID).emit("gameBegun", gamesObject[roomID].players[rndN]);
-        setTimeout(() => {
-          gamesObject[roomID].won = false;
-        }, 3000)
-      }
+    }
+
+    if (gamesObject[roomID].players.length === 2) {
+      let rndN = Math.round(Math.random());
+      gamesObject[roomID].first = rndN;
+      io.to(roomID).emit("gameBegun", gamesObject[roomID].players[rndN]);
+      setTimeout(() => {
+        gamesObject[roomID].won = false;
+      }, 3000);
     }
   });
 
@@ -144,15 +149,15 @@ io.on('connection', function (socket) {
       gamesObject[roomID].gamePlan[xPos][yPos] = (round % 2) ? "1" : "2";
 
 
+      io.to(roomID).emit('click success', socket.id, round, xPos, yPos);
       // IMPLEMENT LINES
       if (checkWin(gamesObject[roomID].gamePlan, yPos, xPos, round) != false) {
         io.to(roomID).emit("win", socket.id);
-        gamesObject[roomID].win = true;
+        gamesObject[roomID].won = true;
       }
 
       gamesObject[roomID].round++;
 
-      io.to(roomID).emit('click success', socket.id, round, xPos, yPos);
     } else {
     }
 
@@ -211,6 +216,13 @@ io.on('connection', function (socket) {
         return false;
       }
 
+    }
+  });
+
+  socket.on("roomLeft", function (roomID) {
+    if (gamesObject.hasOwnProperty(roomID)) {
+      delete gamesObject[roomID];
+      io.to(roomID).emit("playerLeft");
     }
   });
 
