@@ -1,16 +1,16 @@
-"user strict"
+"user strict";
 // ? IN DEVELOP LOAD CONFIG >> MONGODB KEY
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv/config');
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv/config");
 }
 
 // * IMPORTS
 // ? EXPRESS
 const express = require("express");
 const app = express();
-const compression = require('compression');
+const compression = require("compression");
 // ? MONGOOSE
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 // ? PASSPORT and SESSION
 const passport = require("passport");
 const session = require("express-session");
@@ -19,21 +19,20 @@ const cors = require("cors");
 const socketIO = require("socket.io");
 const http = require("http");
 
-
 // ? PASSPORT CONFIG
-require('./config/passport')(passport);
+require("./config/passport")(passport);
 
 // ? EXPRESS BODYPARSER
-app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.json()); // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
 
 // ? EXPRESS SESSION
 app.use(
   session({
-    secret: 'secret',
+    secret: "secret",
     resave: true,
     saveUninitialized: true,
-    cookie: { expires: new Date(253402300000000) }
+    cookie: { expires: new Date(253402300000000) },
   })
 );
 
@@ -47,7 +46,6 @@ const indexRouter = require("./routes/index");
 app.use("/api/", apiRouter);
 app.use("/", indexRouter);
 
-
 // app.use(compression());
 if (process.env.NODE_ENV === "production" || true) {
   //Static folder
@@ -59,22 +57,22 @@ if (process.env.NODE_ENV === "production" || true) {
 }
 
 // ? MongoDB Constructor and URL parser deprecation warning fix
-mongoose.set('useUnifiedTopology', true);
-mongoose.set('useNewUrlParser', true);
-mongoose.set('useFindAndModify', false);
+mongoose.set("useUnifiedTopology", true);
+mongoose.set("useNewUrlParser", true);
+mongoose.set("useFindAndModify", false);
 
 // ? DB connection
 mongoose.connect(process.env.DB_CONNECTION);
 const db = mongoose.connection;
 
-db.on("error", error => console.error(error));
+db.on("error", (error) => console.error(error));
 db.once("open", () => console.log("Connected to Mongoose"));
 
 const PORT = process.env.PORT || 3000;
 
 const server = http.Server(app);
 
-// , { origins: '*:*', 
+// , { origins: '*:*',
 const io = socketIO(server, { cookie: false });
 server.listen(PORT);
 
@@ -82,7 +80,7 @@ const gamesObject = {};
 const playersQue = [];
 
 const gamePlan = () => {
-  let gameArray = []
+  let gameArray = [];
   for (let x = 0; x < 15; x++) {
     gameArray.push([]);
     for (let y = 0; y < 15; y++) {
@@ -92,10 +90,11 @@ const gamePlan = () => {
   return gameArray;
 };
 
+let playableTimeout;
 // ? Managing Socket.IO instances
-io.on('connection', function (socket) {
-  console.log(playersQue);
-  // ? Give client set of existing rooms
+let searchNsp = io.of("/search");
+let quickNsp = io.of("/quick");
+searchNsp.on("connection", function(socket) {
   playersQue.push(socket.id);
   if (playersQue.length >= 2) {
     let roomID = genID(gamesObject);
@@ -106,20 +105,28 @@ io.on('connection', function (socket) {
       time0: 300,
       time1: 300,
       timestamp: null,
-      won: true,
-      gamePlan: gamePlan()
+      won: null,
+      gamePlan: gamePlan(),
     };
 
-    io.to(playersQue[0]).emit('gameCreated', roomID);
-    io.to(playersQue[1]).emit('gameCreated', roomID);
+    searchNsp.to(playersQue[0]).emit("gameCreated", roomID);
+    searchNsp.to(playersQue[1]).emit("gameCreated", roomID);
 
     playersQue.splice(0, 2);
   }
 
   console.log(playersQue);
 
+  socket.on("disconnect", function() {
+    if (playersQue.includes(socket.id)) {
+      let indexOfSocket = playersQue.indexOf(socket.id);
+      playersQue.splice(indexOfSocket, 1);
+    }
+  });
+});
 
-  socket.on("gameJoined", function (roomID) {
+quickNsp.on("connection", function(socket) {
+  socket.on("gameJoined", function(roomID) {
     if (!gamesObject.hasOwnProperty(roomID)) {
       socket.emit("roomMissing");
     } else if (gamesObject[roomID].players.length < 2) {
@@ -130,40 +137,51 @@ io.on('connection', function (socket) {
     if (gamesObject[roomID].players.length === 2) {
       let rndN = Math.round(Math.random());
       gamesObject[roomID].first = rndN;
-      io.to(roomID).emit("gameBegun", gamesObject[roomID].players[rndN]);
-      setTimeout(() => {
+      quickNsp.to(roomID).emit("gameBegun", gamesObject[roomID].players[rndN]);
+      playableTimeout = setTimeout(() => {
         gamesObject[roomID].won = false;
       }, 3000);
     }
   });
 
-  socket.on("game click", function (roomID, xPos, yPos) {
-    const round = (gamesObject[roomID].round) + (gamesObject[roomID].first);
+  // VERY NAIVE CLIENT SIDE IMPLEMENTATION
+  socket.on("timeOut", function(timerId, roomID) {
+    gamesObject[roomID].won = true;
+    if (timerId === "timeOne") {
+      quickNsp.to(roomID).emit("timedOut", socket.id, true);
+    } else {
+      quickNsp.to(roomID).emit("timedOut", socket.id, false);
+    }
+  });
+
+  socket.on("game click", function(roomID, xPos, yPos) {
+    const round = gamesObject[roomID].round + gamesObject[roomID].first;
     const playersArr = gamesObject[roomID].players;
     const won = gamesObject[roomID].won;
     const gamePlan = gamesObject[roomID].gamePlan;
 
-    if (playersArr[round % 2] === socket.id && !won && gamePlan[xPos][yPos] === 0) {
+    if (
+      playersArr[round % 2] === socket.id &&
+      won === false &&
+      gamePlan[xPos][yPos] === 0
+    ) {
       // check if valid
 
-      gamesObject[roomID].gamePlan[xPos][yPos] = (round % 2) ? "1" : "2";
+      gamesObject[roomID].gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
 
-
-      io.to(roomID).emit('click success', socket.id, round, xPos, yPos);
+      quickNsp.to(roomID).emit("click success", socket.id, round, xPos, yPos);
       // IMPLEMENT LINES
       if (checkWin(gamesObject[roomID].gamePlan, yPos, xPos, round) != false) {
-        io.to(roomID).emit("win", socket.id);
+        quickNsp.to(roomID).emit("win", socket.id);
         gamesObject[roomID].won = true;
       }
 
       gamesObject[roomID].round++;
-
     } else {
     }
 
-
     function checkWin(gamePlan, yPos, xPos, round) {
-      const tile = (round % 2) ? "1" : "2";
+      const tile = round % 2 ? "1" : "2";
 
       let horizont = 0;
       let vertical = 0;
@@ -188,7 +206,12 @@ io.on('connection', function (socket) {
           }
         }
 
-        if (yPos + x >= 0 && yPos + x <= 14 && xPos + x >= 0 && xPos + x <= 14) {
+        if (
+          yPos + x >= 0 &&
+          yPos + x <= 14 &&
+          xPos + x >= 0 &&
+          xPos + x <= 14
+        ) {
           if (gamePlan[xPos + x][yPos + x] === tile) {
             diagonalR++;
           } else {
@@ -196,14 +219,24 @@ io.on('connection', function (socket) {
           }
         }
 
-        if (yPos + x >= 0 && yPos + x <= 14 && xPos - x >= 0 && xPos - x <= 14) {
+        if (
+          yPos + x >= 0 &&
+          yPos + x <= 14 &&
+          xPos - x >= 0 &&
+          xPos - x <= 14
+        ) {
           if (gamePlan[xPos - x][yPos + x] === tile) {
             diagonalL++;
           } else {
             diagonalL = 0;
           }
         }
-        if (horizont >= 5 || vertical >= 5 || diagonalL >= 5 || diagonalR >= 5) {
+        if (
+          horizont >= 5 ||
+          vertical >= 5 ||
+          diagonalL >= 5 ||
+          diagonalR >= 5
+        ) {
           return "win";
         }
       }
@@ -215,28 +248,31 @@ io.on('connection', function (socket) {
       } else {
         return false;
       }
-
     }
   });
 
-  socket.on("roomLeft", function (roomID) {
-    if (gamesObject.hasOwnProperty(roomID)) {
-      delete gamesObject[roomID];
-      io.to(roomID).emit("playerLeft");
+  socket.on("disconnect", function() {
+    let existingRooms = Object.keys(gamesObject);
+    for (let room of existingRooms) {
+      if (gamesObject[room].players.includes(socket.id)) {
+        if (gamesObject[room].won == null || gamesObject[room].won == false)
+          quickNsp.to(room).emit("playerLeft");
+        delete gamesObject[room];
+      }
     }
+    clearTimeout(playableTimeout);
   });
-
-  socket.on('disconnect', function () {
-    let indexOfSocket = playersQue.indexOf(socket.id);
-    playersQue.splice(indexOfSocket, 1);
-  })
 });
 
 function genID(compareArr) {
   for (let x = 0; x < 100; x++) {
-    let randID = '_' + Math.random().toString(36).substr(2, 9);
-    if (!(compareArr.hasOwnProperty(randID))) {
+    let randID =
+      "_" +
+      Math.random()
+        .toString(36)
+        .substr(2, 9);
+    if (!compareArr.hasOwnProperty(randID)) {
       return randID;
     }
   }
-};
+}
