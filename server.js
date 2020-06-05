@@ -90,7 +90,6 @@ const gamePlan = () => {
   return gameArray;
 };
 
-let playableTimeout;
 // ? Managing Socket.IO instances
 let searchNsp = io.of("/search");
 let quickNsp = io.of("/quick");
@@ -115,8 +114,6 @@ searchNsp.on("connection", function(socket) {
     playersQue.splice(0, 2);
   }
 
-  console.log(playersQue);
-
   socket.on("disconnect", function() {
     if (playersQue.includes(socket.id)) {
       let indexOfSocket = playersQue.indexOf(socket.id);
@@ -138,8 +135,10 @@ quickNsp.on("connection", function(socket) {
       let rndN = Math.round(Math.random());
       gamesObject[roomID].first = rndN;
       quickNsp.to(roomID).emit("gameBegun", gamesObject[roomID].players[rndN]);
-      playableTimeout = setTimeout(() => {
-        gamesObject[roomID].won = false;
+      setTimeout(() => {
+        if (gamesObject[roomID]) {
+          gamesObject[roomID].won = false;
+        }
       }, 3000);
     }
   });
@@ -260,7 +259,6 @@ quickNsp.on("connection", function(socket) {
         delete gamesObject[room];
       }
     }
-    clearTimeout(playableTimeout);
   });
 });
 
