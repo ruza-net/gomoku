@@ -126,20 +126,24 @@ quickNsp.on("connection", function(socket) {
   socket.on("gameJoined", function(roomID) {
     if (!gamesObject.hasOwnProperty(roomID)) {
       socket.emit("roomMissing");
-    } else if (gamesObject[roomID].players.length < 2) {
-      socket.join(roomID);
-      gamesObject[roomID].players.push(socket.id);
-    }
+    } else {
+      if (gamesObject[roomID].players.length < 2) {
+        socket.join(roomID);
+        gamesObject[roomID].players.push(socket.id);
+      }
 
-    if (gamesObject[roomID].players.length === 2) {
-      let rndN = Math.round(Math.random());
-      gamesObject[roomID].first = rndN;
-      quickNsp.to(roomID).emit("gameBegun", gamesObject[roomID].players[rndN]);
-      setTimeout(() => {
-        if (gamesObject[roomID]) {
-          gamesObject[roomID].won = false;
-        }
-      }, 3000);
+      if (gamesObject[roomID].players.length === 2) {
+        let rndN = Math.round(Math.random());
+        gamesObject[roomID].first = rndN;
+        quickNsp
+          .to(roomID)
+          .emit("gameBegun", gamesObject[roomID].players[rndN]);
+        setTimeout(() => {
+          if (gamesObject[roomID]) {
+            gamesObject[roomID].won = false;
+          }
+        }, 3000);
+      }
     }
   });
 
