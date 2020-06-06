@@ -181,6 +181,7 @@ quickNsp.on("connection", function(socket) {
 
       gamesObject[roomID].round++;
     } else {
+      console.log(socket.id, playersArr, round, xPos, yPos, roomID, won);
     }
 
     function checkWin(gamePlan, yPos, xPos, round) {
