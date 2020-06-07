@@ -1,4 +1,4 @@
-"user strict";
+"use strict";
 // ? IN DEVELOP LOAD CONFIG >> MONGODB KEY
 if (process.env.NODE_ENV !== "production") {
   require("dotenv/config");
@@ -9,12 +9,15 @@ if (process.env.NODE_ENV !== "production") {
 const express = require("express");
 const app = express();
 const compression = require("compression");
+
 // ? MONGOOSE
 const mongoose = require("mongoose");
+
 // ? PASSPORT and SESSION
 const passport = require("passport");
-const session = require("express-session");
+const session = require("cookie-session");
 const cors = require("cors");
+
 // ? SOCKET.IO + HTTP
 const socketIO = require("socket.io");
 const http = require("http");
@@ -101,9 +104,10 @@ searchNsp.on("connection", function(socket) {
       players: [],
       first: null,
       round: 0,
-      time0: 300,
-      time1: 300,
-      timestamp: null,
+      times: [
+        [303, Date.now()],
+        [303, Date.now()],
+      ],
       won: null,
       gamePlan: gamePlan(),
     };
@@ -138,22 +142,26 @@ quickNsp.on("connection", function(socket) {
         quickNsp
           .to(roomID)
           .emit("gameBegun", gamesObject[roomID].players[rndN]);
+        gamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
+        gamesObject[roomID].timerDelta = setInterval(() => {
+          if (gamesObject[roomID] && gamesObject[roomID].won !== true) {
+            let timeArr = reTime(
+              gamesObject[roomID].times[Math.abs(rndN)][1],
+              gamesObject[roomID].times[Math.abs(rndN)][0],
+              gamesObject[roomID].players[Math.abs(rndN - 1)],
+              roomID
+            );
+            gamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
+            gamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
+          }
+        }, 1000);
+
         setTimeout(() => {
           if (gamesObject[roomID]) {
             gamesObject[roomID].won = false;
           }
         }, 3000);
       }
-    }
-  });
-
-  // VERY NAIVE CLIENT SIDE IMPLEMENTATION
-  socket.on("timeOut", function(timerId, roomID) {
-    gamesObject[roomID].won = true;
-    if (timerId === "timeOne") {
-      quickNsp.to(roomID).emit("timedOut", socket.id, true);
-    } else {
-      quickNsp.to(roomID).emit("timedOut", socket.id, false);
     }
   });
 
@@ -168,20 +176,43 @@ quickNsp.on("connection", function(socket) {
       won === false &&
       gamePlan[xPos][yPos] === 0
     ) {
-      // check if valid
+      clearInterval(gamesObject[roomID].timerDelta);
 
       gamesObject[roomID].gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
 
-      quickNsp.to(roomID).emit("click success", socket.id, round, xPos, yPos);
+      quickNsp
+        .to(roomID)
+        .emit(
+          "click success",
+          socket.id,
+          round,
+          xPos,
+          yPos,
+          gamesObject[roomID].times,
+          playersArr
+        );
       // IMPLEMENT LINES
       if (checkWin(gamesObject[roomID].gamePlan, yPos, xPos, round) != false) {
         quickNsp.to(roomID).emit("win", socket.id);
         gamesObject[roomID].won = true;
+      } else {
+        gamesObject[roomID].times[Math.abs(round - 1) % 2][1] = Date.now();
+        gamesObject[roomID].timerDelta = setInterval(() => {
+          if (gamesObject[roomID] && gamesObject[roomID].won !== true) {
+            let timeArr = reTime(
+              gamesObject[roomID].times[Math.abs(round - 1) % 2][1],
+              gamesObject[roomID].times[Math.abs(round - 1) % 2][0],
+              gamesObject[roomID].players[round % 2],
+              roomID
+            );
+            gamesObject[roomID].times[Math.abs(round - 1) % 2][0] = timeArr[0];
+            gamesObject[roomID].times[Math.abs(round - 1) % 2][1] += timeArr[1];
+          }
+        }, 1000);
       }
 
       gamesObject[roomID].round++;
     } else {
-      console.log(socket.id, playersArr, round, xPos, yPos, roomID, won);
     }
 
     function checkWin(gamePlan, yPos, xPos, round) {
@@ -261,11 +292,24 @@ quickNsp.on("connection", function(socket) {
       if (gamesObject[room].players.includes(socket.id)) {
         if (gamesObject[room].won == null || gamesObject[room].won == false)
           quickNsp.to(room).emit("playerLeft");
+
+        clearInterval(gamesObject[room].timerDelta);
         delete gamesObject[room];
       }
     }
   });
 });
+
+function reTime(timeStamp, restSeconds, enemyID, roomID) {
+  let deltaTime = Date.now() - timeStamp;
+  if (restSeconds - deltaTime / 1000 <= 0) {
+    clearInterval(gamesObject[roomID].timerDelta);
+    gamesObject[roomID].won = true;
+    quickNsp.to(roomID).emit("win", enemyID);
+  } else {
+    return [restSeconds - deltaTime / 1000, deltaTime];
+  }
+}
 
 function genID(compareArr) {
   for (let x = 0; x < 100; x++) {
