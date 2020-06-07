@@ -105,8 +105,8 @@ searchNsp.on("connection", function(socket) {
       first: null,
       round: 0,
       times: [
-        [303, Date.now()],
-        [303, Date.now()],
+        [300, Date.now()],
+        [300, Date.now()],
       ],
       won: null,
       gamePlan: gamePlan(),
