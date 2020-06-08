@@ -49,7 +49,7 @@ const indexRouter = require("./routes/index");
 app.use("/api/", apiRouter);
 app.use("/", indexRouter);
 
-// app.use(compression());
+app.use(compression());
 if (process.env.NODE_ENV === "production" || true) {
   //Static folder
   app.use(express.static(__dirname + "/public/"));
