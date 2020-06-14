@@ -79,8 +79,16 @@ const server = http.Server(app);
 const io = socketIO(server, { cookie: false });
 server.listen(PORT);
 
-const gamesObject = {};
-const playersQue = [];
+// quick
+const quickGamesObject = {};
+const quickPlayersQue = [];
+
+// private
+const privateGamesObject = {};
+
+// ranked
+const rankedGamesObject = {};
+const rankedPlayersQue = [];
 
 const gamePlan = () => {
   let gameArray = [];
@@ -94,14 +102,21 @@ const gamePlan = () => {
 };
 
 // ? Managing Socket.IO instances
+let commonNsp = io.of("/");
 let searchNsp = io.of("/search");
 let quickNsp = io.of("/quick");
+let waitingRoomNsp = io.of("/waiting");
+let privateNsp = io.of("/private");
+
+commonNsp.on("connection", function(socket) {});
+
 searchNsp.on("connection", function(socket) {
-  playersQue.push(socket.id);
-  if (playersQue.length >= 2) {
-    let roomID = genID(gamesObject);
-    gamesObject[roomID] = {
+  quickPlayersQue.push(socket.id);
+  if (quickPlayersQue.length >= 2) {
+    let roomID = genID(quickGamesObject, 7);
+    quickGamesObject[roomID] = {
       players: [],
+      nicks: {},
       first: null,
       round: 0,
       times: [
@@ -112,53 +127,61 @@ searchNsp.on("connection", function(socket) {
       gamePlan: gamePlan(),
     };
 
-    searchNsp.to(playersQue[0]).emit("gameCreated", roomID);
-    searchNsp.to(playersQue[1]).emit("gameCreated", roomID);
+    searchNsp.to(quickPlayersQue[0]).emit("gameCreated", roomID);
+    searchNsp.to(quickPlayersQue[1]).emit("gameCreated", roomID);
 
-    playersQue.splice(0, 2);
+    quickPlayersQue.splice(0, 2);
   }
 
   socket.on("disconnect", function() {
-    if (playersQue.includes(socket.id)) {
-      let indexOfSocket = playersQue.indexOf(socket.id);
-      playersQue.splice(indexOfSocket, 1);
+    if (quickPlayersQue.includes(socket.id)) {
+      let indexOfSocket = quickPlayersQue.indexOf(socket.id);
+      quickPlayersQue.splice(indexOfSocket, 1);
     }
   });
 });
 
 quickNsp.on("connection", function(socket) {
-  socket.on("gameJoined", function(roomID) {
-    if (!gamesObject.hasOwnProperty(roomID)) {
+  socket.on("gameJoined", function(roomID, username) {
+    if (!quickGamesObject.hasOwnProperty(roomID)) {
       socket.emit("roomMissing");
     } else {
-      if (gamesObject[roomID].players.length < 2) {
+      if (quickGamesObject[roomID].players.length < 2) {
         socket.join(roomID);
-        gamesObject[roomID].players.push(socket.id);
+        quickGamesObject[roomID].players.push(socket.id);
+        quickGamesObject[roomID].nicks[socket.id] = username;
       }
 
-      if (gamesObject[roomID].players.length === 2) {
+      if (quickGamesObject[roomID].players.length === 2) {
         let rndN = Math.round(Math.random());
-        gamesObject[roomID].first = rndN;
+        quickGamesObject[roomID].first = rndN;
         quickNsp
           .to(roomID)
-          .emit("gameBegun", gamesObject[roomID].players[rndN]);
-        gamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
-        gamesObject[roomID].timerDelta = setInterval(() => {
-          if (gamesObject[roomID] && gamesObject[roomID].won !== true) {
+          .emit(
+            "gameBegun",
+            quickGamesObject[roomID].players[rndN],
+            quickGamesObject[roomID].nicks
+          );
+        quickGamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
+        quickGamesObject[roomID].timerDelta = setInterval(() => {
+          if (
+            quickGamesObject[roomID] &&
+            quickGamesObject[roomID].won !== true
+          ) {
             let timeArr = reTime(
-              gamesObject[roomID].times[Math.abs(rndN)][1],
-              gamesObject[roomID].times[Math.abs(rndN)][0],
-              gamesObject[roomID].players[Math.abs(rndN - 1)],
+              quickGamesObject[roomID].times[Math.abs(rndN)][1],
+              quickGamesObject[roomID].times[Math.abs(rndN)][0],
+              quickGamesObject[roomID].players[Math.abs(rndN - 1)],
               roomID
             );
-            gamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
-            gamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
+            quickGamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
+            quickGamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
           }
         }, 1000);
 
         setTimeout(() => {
-          if (gamesObject[roomID]) {
-            gamesObject[roomID].won = false;
+          if (quickGamesObject[roomID]) {
+            quickGamesObject[roomID].won = false;
           }
         }, 3000);
       }
@@ -166,19 +189,20 @@ quickNsp.on("connection", function(socket) {
   });
 
   socket.on("game click", function(roomID, xPos, yPos) {
-    const round = gamesObject[roomID].round + gamesObject[roomID].first;
-    const playersArr = gamesObject[roomID].players;
-    const won = gamesObject[roomID].won;
-    const gamePlan = gamesObject[roomID].gamePlan;
+    const round =
+      quickGamesObject[roomID].round + quickGamesObject[roomID].first;
+    const playersArr = quickGamesObject[roomID].players;
+    const won = quickGamesObject[roomID].won;
+    const gamePlan = quickGamesObject[roomID].gamePlan;
 
     if (
       playersArr[round % 2] === socket.id &&
       won === false &&
       gamePlan[xPos][yPos] === 0
     ) {
-      clearInterval(gamesObject[roomID].timerDelta);
+      clearInterval(quickGamesObject[roomID].timerDelta);
 
-      gamesObject[roomID].gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
+      quickGamesObject[roomID].gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
 
       quickNsp
         .to(roomID)
@@ -188,30 +212,37 @@ quickNsp.on("connection", function(socket) {
           round,
           xPos,
           yPos,
-          gamesObject[roomID].times,
+          quickGamesObject[roomID].times,
           playersArr
         );
       // IMPLEMENT LINES
-      if (checkWin(gamesObject[roomID].gamePlan, yPos, xPos, round) != false) {
+      if (
+        checkWin(quickGamesObject[roomID].gamePlan, yPos, xPos, round) != false
+      ) {
         quickNsp.to(roomID).emit("win", socket.id);
-        gamesObject[roomID].won = true;
+        quickGamesObject[roomID].won = true;
       } else {
-        gamesObject[roomID].times[Math.abs(round - 1) % 2][1] = Date.now();
-        gamesObject[roomID].timerDelta = setInterval(() => {
-          if (gamesObject[roomID] && gamesObject[roomID].won !== true) {
+        quickGamesObject[roomID].times[Math.abs(round - 1) % 2][1] = Date.now();
+        quickGamesObject[roomID].timerDelta = setInterval(() => {
+          if (
+            quickGamesObject[roomID] &&
+            quickGamesObject[roomID].won !== true
+          ) {
             let timeArr = reTime(
-              gamesObject[roomID].times[Math.abs(round - 1) % 2][1],
-              gamesObject[roomID].times[Math.abs(round - 1) % 2][0],
-              gamesObject[roomID].players[round % 2],
+              quickGamesObject[roomID].times[Math.abs(round - 1) % 2][1],
+              quickGamesObject[roomID].times[Math.abs(round - 1) % 2][0],
+              quickGamesObject[roomID].players[round % 2],
               roomID
             );
-            gamesObject[roomID].times[Math.abs(round - 1) % 2][0] = timeArr[0];
-            gamesObject[roomID].times[Math.abs(round - 1) % 2][1] += timeArr[1];
+            quickGamesObject[roomID].times[Math.abs(round - 1) % 2][0] =
+              timeArr[0];
+            quickGamesObject[roomID].times[Math.abs(round - 1) % 2][1] +=
+              timeArr[1];
           }
         }, 1000);
       }
 
-      gamesObject[roomID].round++;
+      quickGamesObject[roomID].round++;
     } else {
     }
 
@@ -287,38 +318,103 @@ quickNsp.on("connection", function(socket) {
   });
 
   socket.on("disconnect", function() {
-    let existingRooms = Object.keys(gamesObject);
+    let existingRooms = Object.keys(quickGamesObject);
     for (let room of existingRooms) {
-      if (gamesObject[room].players.includes(socket.id)) {
-        if (gamesObject[room].won == null || gamesObject[room].won == false)
+      if (quickGamesObject[room].players.includes(socket.id)) {
+        if (
+          quickGamesObject[room].won == null ||
+          quickGamesObject[room].won == false
+        )
           quickNsp.to(room).emit("playerLeft");
 
-        clearInterval(gamesObject[room].timerDelta);
-        delete gamesObject[room];
+        clearInterval(quickGamesObject[room].timerDelta);
+        delete quickGamesObject[room];
       }
     }
   });
 });
 
+waitingRoomNsp.on("connection", function(socket, username) {
+  socket.on("createRoom", function() {
+    let roomID = genID(privateGamesObject, 4);
+    privateGamesObject[roomID] = {
+      players: [],
+      nicks: {},
+      first: null,
+      round: 0,
+      times: [
+        [300, Date.now()],
+        [300, Date.now()],
+      ],
+      won: null,
+      gamePlan: gamePlan(),
+    };
+    let rndN = Math.round(Math.random());
+    privateGamesObject[roomID].first = rndN;
+
+    socket.join(roomID);
+    privateGamesObject[roomID].players.push(socket.id);
+    privateGamesObject[roomID].nicks[socket.id] = username;
+
+    socket.emit("roomGenerated", roomID);
+  });
+  socket.on("roomJoined", function(roomID) {
+    if (privateGamesObject.hasOwnProperty(roomID)) {
+      socket.join(roomID);
+      privateGamesObject[roomID].players.push(socket.id);
+      privateGamesObject[roomID].nicks[socket.id] = username;
+
+      privateNsp.to(roomID).emit("gameBegun", roomID);
+
+      setTimeout(() => {
+        if (privateGamesObject[roomID]) {
+          privateGamesObject[roomID].won = false;
+        }
+      }, 3000);
+
+      let rndN = privateGamesObject[roomID].first;
+      privateGamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
+      privateGamesObject[roomID].timerDelta = setInterval(() => {
+        if (
+          privateGamesObject[roomID] &&
+          privateGamesObject[roomID].won !== true
+        ) {
+          let timeArr = reTime(
+            privateGamesObject[roomID].times[Math.abs(rndN)][1],
+            privateGamesObject[roomID].times[Math.abs(rndN)][0],
+            privateGamesObject[roomID].players[Math.abs(rndN - 1)],
+            roomID
+          );
+          privateGamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
+          privateGamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
+        }
+      }, 1000);
+    } else {
+      socket.emit("room invalid");
+    }
+  });
+  socket.on("disconnect", function() {});
+});
+
 function reTime(timeStamp, restSeconds, enemyID, roomID) {
   let deltaTime = Date.now() - timeStamp;
   if (restSeconds - deltaTime / 1000 <= 0) {
-    clearInterval(gamesObject[roomID].timerDelta);
-    gamesObject[roomID].won = true;
+    clearInterval(quickGamesObject[roomID].timerDelta);
+    quickGamesObject[roomID].won = true;
     quickNsp.to(roomID).emit("win", enemyID);
   } else {
     return [restSeconds - deltaTime / 1000, deltaTime];
   }
 }
 
-function genID(compareArr) {
+function genID(compareObject, length) {
+  if (length <= 0) return false;
   for (let x = 0; x < 100; x++) {
-    let randID =
-      "_" +
-      Math.random()
-        .toString(36)
-        .substr(2, 9);
-    if (!compareArr.hasOwnProperty(randID)) {
+    let randID = Math.random()
+      .toString(36)
+      .substr(2, length)
+      .toUpperCase();
+    if (!compareObject.hasOwnProperty(randID)) {
       return randID;
     }
   }
