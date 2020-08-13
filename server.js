@@ -103,10 +103,12 @@ const gamePlan = () => {
 
 // ? Managing Socket.IO instances
 let commonNsp = io.of("/");
-let searchNsp = io.of("/search");
-let quickNsp = io.of("/quick");
+let searchNsp = io.of("/q/search");
+let rankedSearchNsp = io.of("/r/search");
+let quickNsp = io.of("/q/game");
+let rankedGameNsp = io.of("/r/game");
+let privateGameNsp = io.of("/p/game");
 let waitingRoomNsp = io.of("/waiting");
-let privateNsp = io.of("/private");
 
 commonNsp.on("connection", function(socket) {});
 
@@ -335,7 +337,7 @@ quickNsp.on("connection", function(socket) {
 });
 
 waitingRoomNsp.on("connection", function(socket, username) {
-  socket.on("createRoom", function() {
+  socket.on("createRoom", function(timeInMinutes) {
     let roomID = genID(privateGamesObject, 4);
     privateGamesObject[roomID] = {
       players: [],
@@ -343,57 +345,234 @@ waitingRoomNsp.on("connection", function(socket, username) {
       first: null,
       round: 0,
       times: [
-        [300, Date.now()],
-        [300, Date.now()],
+        [timeInMinutes * 60, Date.now()],
+        [timeInMinutes * 60, Date.now()],
       ],
       won: null,
       gamePlan: gamePlan(),
     };
-    let rndN = Math.round(Math.random());
-    privateGamesObject[roomID].first = rndN;
 
     socket.join(roomID);
-    privateGamesObject[roomID].players.push(socket.id);
-    privateGamesObject[roomID].nicks[socket.id] = username;
-
     socket.emit("roomGenerated", roomID);
   });
   socket.on("roomJoined", function(roomID) {
     if (privateGamesObject.hasOwnProperty(roomID)) {
       socket.join(roomID);
-      privateGamesObject[roomID].players.push(socket.id);
-      privateGamesObject[roomID].nicks[socket.id] = username;
 
-      privateNsp.to(roomID).emit("gameBegun", roomID);
-
-      setTimeout(() => {
-        if (privateGamesObject[roomID]) {
-          privateGamesObject[roomID].won = false;
-        }
-      }, 3000);
-
-      let rndN = privateGamesObject[roomID].first;
-      privateGamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
-      privateGamesObject[roomID].timerDelta = setInterval(() => {
-        if (
-          privateGamesObject[roomID] &&
-          privateGamesObject[roomID].won !== true
-        ) {
-          let timeArr = reTime(
-            privateGamesObject[roomID].times[Math.abs(rndN)][1],
-            privateGamesObject[roomID].times[Math.abs(rndN)][0],
-            privateGamesObject[roomID].players[Math.abs(rndN - 1)],
-            roomID
-          );
-          privateGamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
-          privateGamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
-        }
-      }, 1000);
+      privateGamesObject[roomID].won = false;
+      waitingRoomNsp.to(roomID).emit("gameBegun", roomID);
     } else {
       socket.emit("room invalid");
     }
   });
-  socket.on("disconnect", function() {});
+  socket.on("disconnect", function() {
+    let existingRooms = Object.keys(privateGamesObject);
+    for (let room of existingRooms) {
+      if (privateGamesObject[room].players.includes(socket.id)) {
+        if (privateGamesObject[room].won === null)
+          delete privateGamesObject[room];
+      }
+    }
+  });
+});
+
+privateGameNsp.on("connection", function(socket) {
+  socket.on("gameJoined", function(roomID, username) {
+    if (!privateGamesObject.hasOwnProperty(roomID)) {
+      socket.emit("roomMissing");
+    } else {
+      privateGamesObject[roomID].won = null;
+      if (privateGamesObject[roomID].players.length < 2) {
+        socket.join(roomID);
+        privateGamesObject[roomID].players.push(socket.id);
+        privateGamesObject[roomID].nicks[socket.id] = username;
+      }
+      socket.join(roomID);
+      if (privateGamesObject[roomID].players.length === 2) {
+        let rndN = Math.round(Math.random());
+        privateGamesObject[roomID].first = rndN;
+        privateGameNsp
+          .to(roomID)
+          .emit(
+            "gameBegun",
+            privateGamesObject[roomID].players[rndN],
+            privateGamesObject[roomID].nicks
+          );
+        if (privateGamesObject[roomID].times[0]) {
+          privateGamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
+          privateGamesObject[roomID].timerDelta = setInterval(() => {
+            if (
+              privateGamesObject[roomID] &&
+              privateGamesObject[roomID].won !== true
+            ) {
+              let timeArr = reTime(
+                privateGamesObject[roomID].times[Math.abs(rndN)][1],
+                privateGamesObject[roomID].times[Math.abs(rndN)][0],
+                privateGamesObject[roomID].players[Math.abs(rndN - 1)],
+                roomID
+              );
+              privateGamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
+              privateGamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
+            }
+          }, 1000);
+        }
+
+        setTimeout(() => {
+          if (privateGamesObject[roomID]) {
+            privateGamesObject[roomID].won = false;
+          }
+        }, 3000);
+      }
+    }
+  });
+
+  socket.on("game click", function(roomID, xPos, yPos) {
+    const round =
+      privateGamesObject[roomID].round + privateGamesObject[roomID].first;
+    const playersArr = privateGamesObject[roomID].players;
+    const won = privateGamesObject[roomID].won;
+    const gamePlan = privateGamesObject[roomID].gamePlan;
+
+    if (
+      playersArr[round % 2] === socket.id &&
+      won === false &&
+      gamePlan[xPos][yPos] === 0
+    ) {
+      clearInterval(privateGamesObject[roomID].timerDelta);
+
+      privateGamesObject[roomID].gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
+
+      privateGameNsp
+        .to(roomID)
+        .emit(
+          "click success",
+          socket.id,
+          round,
+          xPos,
+          yPos,
+          privateGamesObject[roomID].times,
+          playersArr
+        );
+      // IMPLEMENT LINES
+      if (
+        checkWin(privateGamesObject[roomID].gamePlan, yPos, xPos, round) !=
+        false
+      ) {
+        privateGameNsp.to(roomID).emit("win", socket.id);
+        privateGamesObject[roomID].won = true;
+      } else {
+        privateGamesObject[roomID].times[
+          Math.abs(round - 1) % 2
+        ][1] = Date.now();
+        privateGamesObject[roomID].timerDelta = setInterval(() => {
+          if (
+            privateGamesObject[roomID] &&
+            privateGamesObject[roomID].won !== true
+          ) {
+            let timeArr = reTime(
+              privateGamesObject[roomID].times[Math.abs(round - 1) % 2][1],
+              privateGamesObject[roomID].times[Math.abs(round - 1) % 2][0],
+              privateGamesObject[roomID].players[round % 2],
+              roomID
+            );
+            privateGamesObject[roomID].times[Math.abs(round - 1) % 2][0] =
+              timeArr[0];
+            privateGamesObject[roomID].times[Math.abs(round - 1) % 2][1] +=
+              timeArr[1];
+          }
+        }, 1000);
+      }
+
+      privateGamesObject[roomID].round++;
+    } else {
+    }
+
+    function checkWin(gamePlan, yPos, xPos, round) {
+      const tile = round % 2 ? "1" : "2";
+
+      let horizont = 0;
+      let vertical = 0;
+      let diagonalR = 0;
+      let diagonalL = 0;
+      for (let x = -4; x < 5; x++) {
+        // * Horizontal check
+
+        if (xPos + x >= 0 && xPos + x <= 14) {
+          if (gamePlan[xPos + x][yPos] === tile) {
+            horizont++;
+          } else {
+            horizont = 0;
+          }
+        }
+
+        if (yPos + x >= 0 && yPos + x <= 14) {
+          if (gamePlan[xPos][yPos + x] === tile) {
+            vertical++;
+          } else {
+            vertical = 0;
+          }
+        }
+
+        if (
+          yPos + x >= 0 &&
+          yPos + x <= 14 &&
+          xPos + x >= 0 &&
+          xPos + x <= 14
+        ) {
+          if (gamePlan[xPos + x][yPos + x] === tile) {
+            diagonalR++;
+          } else {
+            diagonalR = 0;
+          }
+        }
+
+        if (
+          yPos + x >= 0 &&
+          yPos + x <= 14 &&
+          xPos - x >= 0 &&
+          xPos - x <= 14
+        ) {
+          if (gamePlan[xPos - x][yPos + x] === tile) {
+            diagonalL++;
+          } else {
+            diagonalL = 0;
+          }
+        }
+        if (
+          horizont >= 5 ||
+          vertical >= 5 ||
+          diagonalL >= 5 ||
+          diagonalR >= 5
+        ) {
+          return "win";
+        }
+      }
+
+      if (horizont >= 5 || vertical >= 5 || diagonalL >= 5 || diagonalR >= 5) {
+        return "win";
+      } else if (round === 225) {
+        return "tie";
+      } else {
+        return false;
+      }
+    }
+  });
+
+  socket.on("disconnect", function() {
+    let existingRooms = Object.keys(privateGamesObject);
+    for (let room of existingRooms) {
+      if (privateGamesObject[room].players.includes(socket.id)) {
+        if (
+          privateGamesObject[room].won == null ||
+          privateGamesObject[room].won == false
+        )
+          privateGameNsp.to(room).emit("playerLeft");
+
+        clearInterval(privateGamesObject[room].timerDelta);
+        delete privateGamesObject[room];
+      }
+    }
+  });
 });
 
 function reTime(timeStamp, restSeconds, enemyID, roomID) {
