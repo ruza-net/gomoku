@@ -122,8 +122,8 @@ searchNsp.on("connection", function(socket) {
       first: null,
       round: 0,
       times: [
-        [300, Date.now()],
-        [300, Date.now()],
+        [150, Date.now()],
+        [150, Date.now()],
       ],
       won: null,
       gamePlan: gamePlan(),
@@ -344,6 +344,7 @@ waitingRoomNsp.on("connection", function(socket, username) {
       nicks: {},
       first: null,
       round: 0,
+      timedGame: timeInMinutes,
       times: [
         [timeInMinutes * 60, Date.now()],
         [timeInMinutes * 60, Date.now()],
@@ -360,7 +361,9 @@ waitingRoomNsp.on("connection", function(socket, username) {
       socket.join(roomID);
 
       privateGamesObject[roomID].won = false;
-      waitingRoomNsp.to(roomID).emit("gameBegun", roomID);
+      waitingRoomNsp
+        .to(roomID)
+        .emit("gameBegun", roomID, privateGamesObject[roomID].times[0][0]);
     } else {
       socket.emit("room invalid");
     }
@@ -398,7 +401,7 @@ privateGameNsp.on("connection", function(socket) {
             privateGamesObject[roomID].players[rndN],
             privateGamesObject[roomID].nicks
           );
-        if (privateGamesObject[roomID].times[0]) {
+        if (privateGamesObject[roomID].timedGame) {
           privateGamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
           privateGamesObject[roomID].timerDelta = setInterval(() => {
             if (
@@ -461,28 +464,29 @@ privateGameNsp.on("connection", function(socket) {
         privateGameNsp.to(roomID).emit("win", socket.id);
         privateGamesObject[roomID].won = true;
       } else {
-        privateGamesObject[roomID].times[
-          Math.abs(round - 1) % 2
-        ][1] = Date.now();
-        privateGamesObject[roomID].timerDelta = setInterval(() => {
-          if (
-            privateGamesObject[roomID] &&
-            privateGamesObject[roomID].won !== true
-          ) {
-            let timeArr = reTime(
-              privateGamesObject[roomID].times[Math.abs(round - 1) % 2][1],
-              privateGamesObject[roomID].times[Math.abs(round - 1) % 2][0],
-              privateGamesObject[roomID].players[round % 2],
-              roomID
-            );
-            privateGamesObject[roomID].times[Math.abs(round - 1) % 2][0] =
-              timeArr[0];
-            privateGamesObject[roomID].times[Math.abs(round - 1) % 2][1] +=
-              timeArr[1];
-          }
-        }, 1000);
+        if (privateGamesObject[roomID].timedGame) {
+          privateGamesObject[roomID].times[
+            Math.abs(round - 1) % 2
+          ][1] = Date.now();
+          privateGamesObject[roomID].timerDelta = setInterval(() => {
+            if (
+              privateGamesObject[roomID] &&
+              privateGamesObject[roomID].won !== true
+            ) {
+              let timeArr = reTime(
+                privateGamesObject[roomID].times[Math.abs(round - 1) % 2][1],
+                privateGamesObject[roomID].times[Math.abs(round - 1) % 2][0],
+                privateGamesObject[roomID].players[round % 2],
+                roomID
+              );
+              privateGamesObject[roomID].times[Math.abs(round - 1) % 2][0] =
+                timeArr[0];
+              privateGamesObject[roomID].times[Math.abs(round - 1) % 2][1] +=
+                timeArr[1];
+            }
+          }, 1000);
+        }
       }
-
       privateGamesObject[roomID].round++;
     } else {
     }
