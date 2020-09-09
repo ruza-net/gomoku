@@ -3,15 +3,15 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const passport = require("passport");
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const User = require("../models/User");
 
 router.post("/register", (req, res) => {
   const { username, email, password, password2 } = req.body;
   let errors = [];
-  // Check required fields 
+  // Check required fields
   if (!username || !email || !password || !password2) {
     errors.push({ msg: "Please fill in all the fields" });
   }
@@ -21,9 +21,9 @@ router.post("/register", (req, res) => {
     errors.push({ msg: "Passwords don't match" });
   }
 
-  // Check password strength 
+  // Check password strength
   if (password.length < 3) {
-    errors.push({ msg: "Password must be longer" })
+    errors.push({ msg: "Password must be longer" });
   }
 
   if (errors.length > 0) {
@@ -31,20 +31,18 @@ router.post("/register", (req, res) => {
     res.status(500).send(errors[0].msg);
   } else {
     // Validation passed
-    User.findOne({ username: username }).then(user => {
-
+    User.findOne({ username: username }).then((user) => {
       if (user) {
         res.status(500).send("Username is already taken");
       } else {
-        User.findOne({ email: email }).then(userEmail => {
-
+        User.findOne({ email: email }).then((userEmail) => {
           if (userEmail) {
             res.status(500).send("Email is already taken");
           } else {
             const newUser = new User({
               username,
               email,
-              password
+              password,
             });
 
             // Hash Password
@@ -57,33 +55,31 @@ router.post("/register", (req, res) => {
                 // Save user
                 newUser
                   .save()
-                  .then(user => {
+                  .then((user) => {
                     res.status(200).send("Successfully registered");
                   })
                   .catch((err) => console.log(err));
-              }));
+              })
+            );
           }
         });
-
-      };
+      }
     });
-  };
+  }
 });
 
-router.post('/login',
-  passport.authenticate('local'),
-  function (req, res) {
-    // If this function gets called, authentication was successful.
-    // `req.user` contains the authenticated user.
-    res.status(200).send("");
-  });
+router.post("/login", passport.authenticate("local"), function(req, res) {
+  // If this function gets called, authentication was successful.
+  // `req.user` contains the authenticated user.
+  res.status(200).send("");
+});
 
-router.post('/islogged', (req, res) => {
+router.post("/islogged", (req, res) => {
   if (req.user) {
     res.status(200).send(req.user);
   } else {
     // not logged in
-    res.status(500).send("not logged");
+    res.send("not logged");
   }
 });
 
@@ -95,11 +91,13 @@ router.post("/changeColors", (req, res) => {
   } else {
     let username = req.user.username;
     let colorsConcat = `${colorMain},${colorSecond},${colorMainDark}`;
-    User.findOneAndUpdate({ username: username }, { colors: colorsConcat }).then(function () {
-      res.status(200).send();
-    }).catch((err) => {
-      console.log(err);
-    })
+    User.findOneAndUpdate({ username: username }, { colors: colorsConcat })
+      .then(function() {
+        res.status(200).send();
+      })
+      .catch((err) => {
+        console.log(err);
+      });
   }
 });
 
@@ -111,39 +109,39 @@ router.post("/logout", (req, res) => {
 router.post("/contact", (req, res) => {
   const { nickname, email, message } = req.body;
   if (!nickname || !email || !message) {
-    res.status(500).send("Please fill in all the fields")
+    res.status(500).send("Please fill in all the fields");
   } else {
     const transporter = nodemailer.createTransport({
-      host: 'smtp.zoho.eu',
+      host: "smtp.zoho.eu",
       port: 465,
       secure: true, //ssl
       auth: {
-        user: 'admin@playgomoku.com ',
-        pass: 'REtkBLViPj2QCVU'
-      }
-    })
+        user: "admin@playgomoku.com ",
+        pass: "REtkBLViPj2QCVU",
+      },
+    });
     const mailOptions = {
-      from: 'admin@playgomoku.com',
-      to: 'admin@playgomoku.com',
+      from: "admin@playgomoku.com",
+      to: "admin@playgomoku.com",
       subject: `${nickname}`,
       text: `${message}`,
-      replyTo: `${email}`
-    }
-    transporter.sendMail(mailOptions, function (err) {
+      replyTo: `${email}`,
+    };
+    transporter.sendMail(mailOptions, function(err) {
       if (err) {
         console.log(err);
         res.status(500).send("Unexpected problem");
       } else {
         res.status(200).send("Message sent");
       }
-    })
+    });
   }
 });
 
 router.post("/changepassword", (req, res) => {
   const { username, password, password2 } = req.body;
   let errors = [];
-  // Check required fields 
+  // Check required fields
   if (!password || !password2) {
     errors.push({ msg: "Please fill in all the fields" });
   }
@@ -153,9 +151,9 @@ router.post("/changepassword", (req, res) => {
     errors.push({ msg: "Passwords don't match" });
   }
 
-  // Check password strength 
+  // Check password strength
   if (password.length < 8) {
-    errors.push({ msg: "Password is shorter than 8 characters" })
+    errors.push({ msg: "Password is shorter than 8 characters" });
   }
 
   if (errors.length > 0) {
@@ -165,21 +163,22 @@ router.post("/changepassword", (req, res) => {
       errors,
       username,
       password,
-      password2
+      password2,
     });
   } else {
     // * Hashing password
     bcrypt.genSalt(10, (err, salt) =>
       bcrypt.hash(password, salt, (err, hash) => {
-        let updatePass = User.findOneAndUpdate({ username: username }, { password: hash }).then(function () {
+        let updatePass = User.findOneAndUpdate(
+          { username: username },
+          { password: hash }
+        ).then(function() {
           req.flash("success_msg", "Password succesfully changed");
-          res.redirect("/settings")
+          res.redirect("/settings");
         });
-      }))
-
+      })
+    );
   }
 });
-
-
 
 module.exports = router;

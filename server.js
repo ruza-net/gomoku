@@ -12,6 +12,7 @@ const compression = require("compression");
 
 // ? MONGOOSE
 const mongoose = require("mongoose");
+const User = require("./models/User");
 
 // ? PASSPORT and SESSION
 const passport = require("passport");
@@ -75,8 +76,13 @@ const PORT = process.env.PORT || 3000;
 
 const server = http.Server(app);
 
+const genID = require("./utils/genUniqueID");
+const checkWin = require("./utils/checkWin");
+const gamePlan = require("./utils/genGamePlan");
+const calibrateTime = require("./utils/calibrateTime");
+
 // , { origins: '*:*',
-const io = socketIO(server, { cookie: false });
+const io = socketIO(server);
 server.listen(PORT);
 
 // quick
@@ -90,27 +96,22 @@ const privateGamesObject = {};
 const rankedGamesObject = {};
 const rankedPlayersQue = [];
 
-const gamePlan = () => {
-  let gameArray = [];
-  for (let x = 0; x < 15; x++) {
-    gameArray.push([]);
-    for (let y = 0; y < 15; y++) {
-      gameArray[x].push(0);
-    }
-  }
-  return gameArray;
+const gameMod = {
+  quick: {},
+  private: {},
+  ranked: {
+    que: [],
+    games: {},
+  },
 };
 
 // ? Managing Socket.IO instances
-let commonNsp = io.of("/");
 let searchNsp = io.of("/q/search");
 let rankedSearchNsp = io.of("/r/search");
 let quickNsp = io.of("/q/game");
-let rankedGameNsp = io.of("/r/game");
+let rankedNsp = io.of("/r/game");
 let privateGameNsp = io.of("/p/game");
 let waitingRoomNsp = io.of("/waiting");
-
-commonNsp.on("connection", function(socket) {});
 
 searchNsp.on("connection", function(socket) {
   quickPlayersQue.push(socket.id);
@@ -170,12 +171,7 @@ quickNsp.on("connection", function(socket) {
             quickGamesObject[roomID] &&
             quickGamesObject[roomID].won !== true
           ) {
-            let timeArr = reTime(
-              quickGamesObject[roomID].times[Math.abs(rndN)][1],
-              quickGamesObject[roomID].times[Math.abs(rndN)][0],
-              quickGamesObject[roomID].players[Math.abs(rndN - 1)],
-              roomID
-            );
+            let timeArr = calibrateTime(quickGamesObject, roomID, quickNsp);
             quickGamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
             quickGamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
           }
@@ -230,7 +226,7 @@ quickNsp.on("connection", function(socket) {
             quickGamesObject[roomID] &&
             quickGamesObject[roomID].won !== true
           ) {
-            let timeArr = reTime(
+            let timeArr = calibrateTime(
               quickGamesObject[roomID].times[Math.abs(round - 1) % 2][1],
               quickGamesObject[roomID].times[Math.abs(round - 1) % 2][0],
               quickGamesObject[roomID].players[round % 2],
@@ -246,76 +242,6 @@ quickNsp.on("connection", function(socket) {
 
       quickGamesObject[roomID].round++;
     } else {
-    }
-
-    function checkWin(gamePlan, yPos, xPos, round) {
-      const tile = round % 2 ? "1" : "2";
-
-      let horizont = 0;
-      let vertical = 0;
-      let diagonalR = 0;
-      let diagonalL = 0;
-      for (let x = -4; x < 5; x++) {
-        // * Horizontal check
-
-        if (xPos + x >= 0 && xPos + x <= 14) {
-          if (gamePlan[xPos + x][yPos] === tile) {
-            horizont++;
-          } else {
-            horizont = 0;
-          }
-        }
-
-        if (yPos + x >= 0 && yPos + x <= 14) {
-          if (gamePlan[xPos][yPos + x] === tile) {
-            vertical++;
-          } else {
-            vertical = 0;
-          }
-        }
-
-        if (
-          yPos + x >= 0 &&
-          yPos + x <= 14 &&
-          xPos + x >= 0 &&
-          xPos + x <= 14
-        ) {
-          if (gamePlan[xPos + x][yPos + x] === tile) {
-            diagonalR++;
-          } else {
-            diagonalR = 0;
-          }
-        }
-
-        if (
-          yPos + x >= 0 &&
-          yPos + x <= 14 &&
-          xPos - x >= 0 &&
-          xPos - x <= 14
-        ) {
-          if (gamePlan[xPos - x][yPos + x] === tile) {
-            diagonalL++;
-          } else {
-            diagonalL = 0;
-          }
-        }
-        if (
-          horizont >= 5 ||
-          vertical >= 5 ||
-          diagonalL >= 5 ||
-          diagonalR >= 5
-        ) {
-          return "win";
-        }
-      }
-
-      if (horizont >= 5 || vertical >= 5 || diagonalL >= 5 || diagonalR >= 5) {
-        return "win";
-      } else if (round === 225) {
-        return "tie";
-      } else {
-        return false;
-      }
     }
   });
 
@@ -408,7 +334,7 @@ privateGameNsp.on("connection", function(socket) {
               privateGamesObject[roomID] &&
               privateGamesObject[roomID].won !== true
             ) {
-              let timeArr = reTime(
+              let timeArr = calibrateTime(
                 privateGamesObject[roomID].times[Math.abs(rndN)][1],
                 privateGamesObject[roomID].times[Math.abs(rndN)][0],
                 privateGamesObject[roomID].players[Math.abs(rndN - 1)],
@@ -473,7 +399,7 @@ privateGameNsp.on("connection", function(socket) {
               privateGamesObject[roomID] &&
               privateGamesObject[roomID].won !== true
             ) {
-              let timeArr = reTime(
+              let timeArr = calibrateTime(
                 privateGamesObject[roomID].times[Math.abs(round - 1) % 2][1],
                 privateGamesObject[roomID].times[Math.abs(round - 1) % 2][0],
                 privateGamesObject[roomID].players[round % 2],
@@ -579,26 +505,234 @@ privateGameNsp.on("connection", function(socket) {
   });
 });
 
-function reTime(timeStamp, restSeconds, enemyID, roomID) {
-  let deltaTime = Date.now() - timeStamp;
-  if (restSeconds - deltaTime / 1000 <= 0) {
-    clearInterval(quickGamesObject[roomID].timerDelta);
-    quickGamesObject[roomID].won = true;
-    quickNsp.to(roomID).emit("win", enemyID);
-  } else {
-    return [restSeconds - deltaTime / 1000, deltaTime];
-  }
+rankedSearchNsp.on("connection", function(socket) {
+  socket.on("beginSearch", function(username) {
+    // Assign Elo
+    getUserElo(username, (err, elo) => {
+      if (err) console.log(err);
+      gameMod.ranked.que.push({ id: socket.id, elo, username });
+
+      if (gameMod.ranked.que.length >= 2) {
+        let roomID = genID(gameMod.ranked.games, 7);
+        gameMod.ranked.games[roomID] = {
+          players: [],
+          nicks: {},
+          elo: {
+            [gameMod.ranked.que[0].username]: gameMod.ranked.que[0].elo,
+            [gameMod.ranked.que[1].username]: gameMod.ranked.que[1].elo,
+          },
+          first: null,
+          round: 0,
+          intervalLink: null,
+          times: [
+            { timeLeft: 150, timeStamp: Date.now() },
+            { timeLeft: 150, timeStamp: Date.now() },
+          ],
+          won: null,
+          gamePlan: gamePlan(),
+        };
+
+        rankedSearchNsp
+          .to(gameMod.ranked.que[0].id)
+          .emit("gameCreated", roomID);
+        rankedSearchNsp
+          .to(gameMod.ranked.que[1].id)
+          .emit("gameCreated", roomID);
+
+        gameMod.ranked.que.splice(0, 2);
+      }
+    });
+  });
+
+  socket.on("disconnect", function() {
+    for (let queMember of gameMod.ranked.que) {
+      if (queMember.id === socket.id) {
+        let indexOfSocket = gameMod.ranked.que.indexOf(queMember);
+        gameMod.ranked.que.splice(indexOfSocket, 1);
+      }
+    }
+  });
+});
+rankedNsp.on("connection", function(socket) {
+  let games = gameMod.ranked.games;
+
+  socket.on("gameJoined", function(roomID, username) {
+    // Check if room exists, otherwise send to 404
+    if (!games.hasOwnProperty(roomID)) {
+      socket.emit("roomMissing");
+    } else {
+      let game = games[roomID];
+      if (game.players.length < 2) {
+        socket.join(roomID);
+        game.players.push(socket.id);
+        game.nicks[socket.id] = username;
+      }
+
+      if (game.players.length === 2) {
+        // taking random number representing player (0/1)
+        let rndN = Math.round(Math.random());
+        game.first = rndN;
+        rankedNsp.to(roomID).emit("gameBegun", game.players[rndN], game.nicks);
+        game.times[rndN].timeStamp = Date.now();
+        game.intervalLink = setInterval(() => {
+          if (game) {
+            if (game.won !== true) {
+              let calibratedTime = calibrateTime(games, roomID, quickNsp);
+              game.times[rndN].timeLeft = calibratedTime;
+              game.times[rndN].timeStamp = Date.now();
+            }
+          }
+        }, 1000);
+
+        setTimeout(() => {
+          if (games[roomID]) {
+            games[roomID].won = false;
+          }
+        }, 3000);
+      }
+    }
+  });
+
+  socket.on("game click", function(roomID, xPos, yPos) {
+    const game = gameMod.ranked.games[roomID];
+
+    const round = game.round + game.first;
+
+    if (
+      game.players[round % 2] === socket.id &&
+      game.won === false &&
+      game.gamePlan[xPos][yPos] === 0
+    ) {
+      clearInterval(game.intervalLink);
+
+      game.gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
+
+      rankedNsp
+        .to(roomID)
+        .emit(
+          "click success",
+          socket.id,
+          round,
+          xPos,
+          yPos,
+          game.times,
+          game.players
+        );
+
+      const gameBoardState = checkWin(game.gamePlan, yPos, xPos, round);
+      if (gameBoardState !== false) {
+        //  ELO RATING MATH
+        const id1 = Object.keys(game.nicks)[0];
+        const id2 = Object.keys(game.nicks)[1];
+
+        const oldELO1 = game.elo[game.nicks[id1]];
+        const oldELO2 = game.elo[game.nicks[id2]];
+
+        const R1 = Math.pow(10, oldELO1 / 400);
+        const R2 = Math.pow(10, oldELO2 / 400);
+
+        const E1 = R1 / (R1 + R2);
+        const E2 = R2 / (R1 + R2);
+
+        // ELO K-factor, taken from chess
+        const K = 32;
+
+        if (gameBoardState === "win") {
+          const S1 = socket.id === id1 ? 1 : 0;
+          const S2 = socket.id === id2 ? 1 : 0;
+
+          const finalELO1 = Math.round(oldELO1 + K * (S1 - E1));
+          const finalELO2 = Math.round(oldELO2 + K * (S2 - E2));
+
+          updateElo(game.nicks[id1], finalELO1);
+          updateElo(game.nicks[id2], finalELO2);
+
+          const eloDiff = Math.abs(finalELO1 - oldELO1);
+
+          console.log(eloDiff);
+
+          rankedNsp.to(roomID).emit("win", socket.id, eloDiff);
+        } else if (gameBoardState === "tie") {
+          const S1 = 0.5;
+          const S2 = 0.5;
+
+          const finalELO1 = oldELO1 + K * (S1 - E1);
+          const finalELO2 = oldELO2 + K * (S2 - E2);
+
+          updateElo(game.nicks[id1], finalELO1);
+          updateElo(game.nicks[id2], finalELO2);
+
+          const eloDiff = Math.abs(finalELO1 - oldELO1);
+          //@TODO finish tie state
+          const tieGainerID = oldELO1 < finalELO1 ? id1 : id2;
+          rankedNsp.to(roomID).emit("tie", eloDiff, tieGainerID);
+        }
+
+        game.won = true;
+      } else {
+        game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
+        game.intervalLink = setInterval(() => {
+          if (game && game.won !== true) {
+            let calibratedTime = calibrateTime(
+              gameMod.ranked.games,
+              roomID,
+              rankedNsp
+            );
+            game.times[Math.abs(round - 1) % 2].timeLeft = calibratedTime;
+            game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
+          }
+        }, 1000);
+      }
+
+      game.round++;
+    } else {
+    }
+  });
+
+  socket.on("disconnect", function() {
+    let existingRooms = Object.keys(gameMod.ranked.games);
+    for (let room of existingRooms) {
+      if (gameMod.ranked.games[room].players.includes(socket.id)) {
+        if (
+          gameMod.ranked.games[room].won == null ||
+          gameMod.ranked.games[room].won == false
+        )
+          rankedNsp.to(room).emit("playerLeft");
+
+        clearInterval(gameMod.ranked.games[room].intervalLink);
+        delete gameMod.ranked.games[room];
+      }
+    }
+  });
+});
+
+/**
+ *
+ * @param {String} username
+ * @param {Number} newElo
+ * @return {Boolean} true\false
+ */
+function updateElo(username, newElo) {
+  User.findOneAndUpdate({ username }, { elo: newElo })
+    .then(() => {})
+    .catch((err) => {
+      console.log(err);
+    });
 }
 
-function genID(compareObject, length) {
-  if (length <= 0) return false;
-  for (let x = 0; x < 100; x++) {
-    let randID = Math.random()
-      .toString(36)
-      .substr(2, length)
-      .toUpperCase();
-    if (!compareObject.hasOwnProperty(randID)) {
-      return randID;
+/**
+ *
+ * @param {String} username
+ * @param {Function} callback
+ * @return {Number} Elo
+ */
+function getUserElo(username, callback) {
+  User.findOne({ username: username }).then((user) => {
+    if (user) {
+      callback(null, user.elo);
+    } else {
+      const err = new Error("User does not exist");
+      callback(err, null);
     }
-  }
+  });
 }
