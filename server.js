@@ -80,28 +80,22 @@ const genID = require("./utils/genUniqueID");
 const checkWin = require("./utils/checkWin");
 const gamePlan = require("./utils/genGamePlan");
 const calibrateTime = require("./utils/calibrateTime");
+const { isNull } = require("util");
 
-// , { origins: '*:*',
 const io = socketIO(server);
 server.listen(PORT);
 
-// quick
-const quickGamesObject = {};
-const quickPlayersQue = [];
-
 // private
 const privateGamesObject = {};
-
-// ranked
-const rankedGamesObject = {};
-const rankedPlayersQue = [];
 
 const gameMode = {
   quick: {
     que: [],
     games: {},
   },
-  private: {},
+  private: {
+    games: {},
+  },
   ranked: {
     que: [],
     games: {},
@@ -125,6 +119,7 @@ searchNsp.on("connection", function(socket) {
       nicks: {},
       first: null,
       round: 0,
+      isTimed: true,
       intervalLink: null,
       times: [
         { timeLeft: 150, timeStamp: Date.now() },
@@ -165,16 +160,19 @@ quickNsp.on("connection", function(socket) {
 
 waitingRoomNsp.on("connection", function(socket, username) {
   socket.on("createRoom", function(timeInMinutes) {
-    let roomID = genID(privateGamesObject, 4);
-    privateGamesObject[roomID] = {
+    let roomID = genID(gameMode.private.games, 4);
+
+    const isTimed = !isNull(timeInMinutes);
+
+    gameMode.private.games[roomID] = {
       players: [],
       nicks: {},
       first: null,
       round: 0,
-      timedGame: timeInMinutes,
+      isTimed: isTimed,
       times: [
-        [timeInMinutes * 60, Date.now()],
-        [timeInMinutes * 60, Date.now()],
+        { timeLeft: timeInMinutes * 60, timeStamp: Date.now() },
+        { timeLeft: timeInMinutes * 60, timeStamp: Date.now() },
       ],
       won: null,
       gamePlan: gamePlan(),
@@ -184,23 +182,27 @@ waitingRoomNsp.on("connection", function(socket, username) {
     socket.emit("roomGenerated", roomID);
   });
   socket.on("roomJoined", function(roomID) {
-    if (privateGamesObject.hasOwnProperty(roomID)) {
+    if (gameMode.private.games.hasOwnProperty(roomID)) {
       socket.join(roomID);
 
-      privateGamesObject[roomID].won = false;
+      gameMode.private.games[roomID].won = false;
       waitingRoomNsp
         .to(roomID)
-        .emit("gameBegun", roomID, privateGamesObject[roomID].times[0][0]);
+        .emit(
+          "gameBegun",
+          roomID,
+          gameMode.private.games[roomID].times[0].timeLeft
+        );
     } else {
       socket.emit("room invalid");
     }
   });
   socket.on("disconnect", function() {
-    let existingRooms = Object.keys(privateGamesObject);
+    let existingRooms = Object.keys(gameMode.private.games);
     for (let room of existingRooms) {
-      if (privateGamesObject[room].players.includes(socket.id)) {
-        if (privateGamesObject[room].won === null)
-          delete privateGamesObject[room];
+      if (gameMode.private.games[room].players.includes(socket.id)) {
+        if (gameMode.private.games[room].won === null)
+          delete gameMode.private.games[room];
       }
     }
   });
@@ -208,72 +210,23 @@ waitingRoomNsp.on("connection", function(socket, username) {
 
 privateGameNsp.on("connection", function(socket) {
   socket.on("gameJoined", function(roomID, username) {
-    if (!privateGamesObject.hasOwnProperty(roomID)) {
-      socket.emit("roomMissing");
-    } else {
-      privateGamesObject[roomID].won = null;
-      if (privateGamesObject[roomID].players.length < 2) {
-        socket.join(roomID);
-        privateGamesObject[roomID].players.push(socket.id);
-        privateGamesObject[roomID].nicks[socket.id] = username;
-      }
-      socket.join(roomID);
-      if (privateGamesObject[roomID].players.length === 2) {
-        let rndN = Math.round(Math.random());
-        privateGamesObject[roomID].first = rndN;
-        privateGameNsp
-          .to(roomID)
-          .emit(
-            "gameBegun",
-            privateGamesObject[roomID].players[rndN],
-            privateGamesObject[roomID].nicks
-          );
-        if (privateGamesObject[roomID].timedGame) {
-          privateGamesObject[roomID].times[Math.abs(rndN)][1] = Date.now();
-          privateGamesObject[roomID].timerDelta = setInterval(() => {
-            if (
-              privateGamesObject[roomID] &&
-              privateGamesObject[roomID].won !== true
-            ) {
-              let timeArr = calibrateTime(
-                privateGamesObject[roomID].times[Math.abs(rndN)][1],
-                privateGamesObject[roomID].times[Math.abs(rndN)][0],
-                privateGamesObject[roomID].players[Math.abs(rndN - 1)],
-                roomID
-              );
-              privateGamesObject[roomID].times[Math.abs(rndN)][0] = timeArr[0];
-              privateGamesObject[roomID].times[Math.abs(rndN)][1] += timeArr[1];
-            }
-          }, 1000);
-        }
-
-        setTimeout(() => {
-          if (privateGamesObject[roomID]) {
-            privateGamesObject[roomID].won = false;
-          }
-        }, 3000);
-      }
-    }
+    startGame(gameMode.private.games, roomID, username, privateGameNsp, socket);
   });
 
   socket.on("game click", function(roomID, xPos, yPos) {
-    gameClick();
+    gameClick(
+      gameMode.private.games,
+      roomID,
+      xPos,
+      yPos,
+      false,
+      privateGameNsp,
+      socket
+    );
   });
 
   socket.on("disconnect", function() {
-    let existingRooms = Object.keys(privateGamesObject);
-    for (let room of existingRooms) {
-      if (privateGamesObject[room].players.includes(socket.id)) {
-        if (
-          privateGamesObject[room].won == null ||
-          privateGamesObject[room].won == false
-        )
-          privateGameNsp.to(room).emit("playerLeft");
-
-        clearInterval(privateGamesObject[room].timerDelta);
-        delete privateGamesObject[room];
-      }
-    }
+    playerDisconnected(gameMode.private.games, false, privateGameNsp, socket);
   });
 });
 
@@ -296,6 +249,7 @@ rankedSearchNsp.on("connection", function(socket) {
           first: null,
           round: 0,
           intervalLink: null,
+          isTimed: true,
           times: [
             { timeLeft: 150, timeStamp: Date.now() },
             { timeLeft: 150, timeStamp: Date.now() },
@@ -426,14 +380,16 @@ function gameClick(games, roomID, xPos, yPos, rated, namespace, socket) {
 
       game.won = true;
     } else {
-      game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
-      game.intervalLink = setInterval(() => {
-        if (game && game.won !== true) {
-          let calibratedTime = calibrateTime(games, roomID, namespace);
-          game.times[Math.abs(round - 1) % 2].timeLeft = calibratedTime;
-          game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
-        }
-      }, 1000);
+      if (game.isTimed) {
+        game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
+        game.intervalLink = setInterval(() => {
+          if (game && game.won !== true) {
+            let calibratedTime = calibrateTime(games, roomID, namespace);
+            game.times[Math.abs(round - 1) % 2].timeLeft = calibratedTime;
+            game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
+          }
+        }, 1000);
+      }
     }
 
     game.round++;
@@ -529,16 +485,18 @@ function startGame(games, roomID, username, namespace, socket) {
       let rndN = Math.round(Math.random());
       game.first = rndN;
       namespace.to(roomID).emit("gameBegun", game.players[rndN], game.nicks);
-      game.times[rndN].timeStamp = Date.now();
-      game.intervalLink = setInterval(() => {
-        if (game) {
-          if (game.won !== true) {
-            let calibratedTime = calibrateTime(games, roomID, namespace);
-            game.times[rndN].timeLeft = calibratedTime;
-            game.times[rndN].timeStamp = Date.now();
+      if (game.isTimed) {
+        game.times[rndN].timeStamp = Date.now();
+        game.intervalLink = setInterval(() => {
+          if (game) {
+            if (game.won !== true) {
+              let calibratedTime = calibrateTime(games, roomID, namespace);
+              game.times[rndN].timeLeft = calibratedTime;
+              game.times[rndN].timeStamp = Date.now();
+            }
           }
-        }
-      }, 1000);
+        }, 1000);
+      }
 
       setTimeout(() => {
         if (games[roomID]) {
