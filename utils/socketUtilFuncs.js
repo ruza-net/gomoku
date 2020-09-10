@@ -42,64 +42,66 @@ function playerDisconnected(games, rated, namespace, socket) {
 function gameClick(games, roomID, xPos, yPos, rated, namespace, socket) {
   const game = games[roomID];
 
-  const round = game.round + game.first;
+  if (game) {
+    const round = game.round + game.first;
 
-  if (
-    game.players[round % 2] === socket.id &&
-    game.won === false &&
-    game.gamePlan[xPos][yPos] === 0
-  ) {
-    clearInterval(game.intervalLink);
+    if (
+      game.players[round % 2] === socket.id &&
+      game.won === false &&
+      game.gamePlan[xPos][yPos] === 0
+    ) {
+      clearInterval(game.intervalLink);
 
-    game.gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
+      game.gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
 
-    namespace
-      .to(roomID)
-      .emit(
-        "click success",
-        socket.id,
-        round,
-        xPos,
-        yPos,
-        game.times,
-        game.players
-      );
+      namespace
+        .to(roomID)
+        .emit(
+          "click success",
+          socket.id,
+          round,
+          xPos,
+          yPos,
+          game.times,
+          game.players
+        );
 
-    const gameBoardState = checkWin(game.gamePlan, yPos, xPos, round);
-    if (gameBoardState !== false) {
-      if (gameBoardState === "win") {
-        if (rated) {
-          calcAndUpdateELO(game, "win", socket, (eloDiff) => {
-            namespace.to(roomID).emit("win", socket.id, eloDiff);
-          });
-        } else {
-          namespace.to(roomID).emit("win", socket.id);
-        }
-      } else if (gameBoardState === "tie") {
-        if (rated) {
-          calcAndUpdateELO(game, "tie", socket, (eloDiff, tieGainerID) => {
-            namespace.to(roomID).emit("tie", eloDiff, tieGainerID);
-          });
-        } else {
-          namespace.to(roomID).emit("tie");
-        }
-      }
-
-      game.won = true;
-    } else {
-      if (game.isTimed) {
-        game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
-        game.intervalLink = setInterval(() => {
-          if (game && game.won !== true) {
-            let calibratedTime = calibrateTime(games, roomID, namespace);
-            game.times[Math.abs(round - 1) % 2].timeLeft = calibratedTime;
-            game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
+      const gameBoardState = checkWin(game.gamePlan, yPos, xPos, round);
+      if (gameBoardState !== false) {
+        if (gameBoardState === "win") {
+          if (rated) {
+            calcAndUpdateELO(game, "win", socket, (eloDiff) => {
+              namespace.to(roomID).emit("win", socket.id, eloDiff);
+            });
+          } else {
+            namespace.to(roomID).emit("win", socket.id);
           }
-        }, 1000);
-      }
-    }
+        } else if (gameBoardState === "tie") {
+          if (rated) {
+            calcAndUpdateELO(game, "tie", socket, (eloDiff, tieGainerID) => {
+              namespace.to(roomID).emit("tie", eloDiff, tieGainerID);
+            });
+          } else {
+            namespace.to(roomID).emit("tie");
+          }
+        }
 
-    game.round++;
+        game.won = true;
+      } else {
+        if (game.isTimed) {
+          game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
+          game.intervalLink = setInterval(() => {
+            if (game && game.won !== true) {
+              let calibratedTime = calibrateTime(games, roomID, namespace);
+              game.times[Math.abs(round - 1) % 2].timeLeft = calibratedTime;
+              game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
+            }
+          }, 1000);
+        }
+      }
+
+      game.round++;
+    }
   }
 }
 
