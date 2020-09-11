@@ -51,7 +51,6 @@ module.exports = function(passport) {
         passReqToCallback: true,
       },
       (accessToken, refreshToken, profile, done) => {
-        console.log("tried");
         User.findOrCreate({ googleId: profile.id }, function(err, user) {
           if (err) throw err;
           console.log("User: ", user);

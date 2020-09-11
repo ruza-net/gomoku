@@ -12,8 +12,8 @@ router.get(
 router.get(
   "/auth/google/redirect",
   passport.authenticate("google", {
-    successRedirect: "/succ",
-    failureRedirect: "/fail",
+    successRedirect: "/",
+    failureRedirect: "/failed",
   })
 );
 router.post("/port", function(req, res) {

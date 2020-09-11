@@ -9,6 +9,7 @@ if (process.env.NODE_ENV !== "production") {
 const express = require("express");
 const app = express();
 const compression = require("compression");
+const cors = require("cors");
 
 // ? MONGOOSE
 const mongoose = require("mongoose");
@@ -27,6 +28,7 @@ require("./config/passport")(passport);
 // ? EXPRESS BODYPARSER
 app.use(express.json()); // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
+app.use(cors());
 
 // ? EXPRESS SESSION
 app.use(
