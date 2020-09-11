@@ -3,7 +3,6 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const passport = require("passport");
-const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 const User = require("../models/User");
@@ -68,18 +67,22 @@ router.post("/register", (req, res) => {
   }
 });
 
-router.post("/login", passport.authenticate("local"), function(req, res) {
-  // If this function gets called, authentication was successful.
-  // `req.user` contains the authenticated user.
-  res.status(200).send("");
-});
+router.post(
+  "/login",
+  passport.authenticate("local", { session: true }),
+  function(req, res) {
+    // If this function gets called, authentication was successful.
+    // `req.user` contains the authenticated user.
+    res.status(200).send("");
+  }
+);
 
 router.post("/islogged", (req, res) => {
   if (req.user) {
     res.status(200).send(req.user);
   } else {
     // not logged in
-    res.send("not logged");
+    res.send(false);
   }
 });
 

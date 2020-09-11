@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodie
 // ? EXPRESS SESSION
 app.use(
   session({
-    secret: "secret",
+    keys: [process.env.COOKIE_SECRET],
     resave: true,
     saveUninitialized: true,
     cookie: { expires: new Date(253402300000000) },
