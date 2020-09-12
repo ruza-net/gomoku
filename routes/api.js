@@ -4,8 +4,8 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const passport = require("passport");
 const nodemailer = require("nodemailer");
-const genID = require("../utils/genUniqueID");
-
+const jwt = require("jsonwebtoken");
+const jwtAuth = require("../config/jwtAuth");
 const User = require("../models/User");
 
 router.post("/register", (req, res) => {
@@ -82,7 +82,15 @@ router.post("/googleLogin", (req, res) => {
   const { email } = req.body;
   User.findOne({ email: email }).then((user) => {
     if (user) {
-      res.status(200).send({ registered: true, username: user.username });
+      let token = jwt.sign(
+        { __id: user._id, username: user.username },
+        process.env.JWTSECRET
+      );
+
+      res
+        .header("auth-token", token)
+        .status(200)
+        .send({ registered: true, username: user.username });
     } else {
       res.status(200).send({ registered: false, username: null });
     }
@@ -106,8 +114,8 @@ router.post("/islogged", (req, res) => {
   if (req.user) {
     res.status(200).send(req.user);
   } else {
-    // not logged in
-    res.send(false);
+    // not logged in with local
+    jwtAuth(req, res);
   }
 });
 
