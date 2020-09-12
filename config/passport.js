@@ -1,6 +1,5 @@
 "use strict";
 const LocalStrategy = require("passport-local").Strategy;
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const bcrypt = require("bcryptjs");
 
 // Load User Model
@@ -34,28 +33,6 @@ module.exports = function(passport) {
             });
           })
           .catch((err) => console.log(err));
-      }
-    )
-  );
-
-  // Use the GoogleStrategy within Passport.
-  //   Strategies in Passport require a `verify` function, which accept
-  //   credentials (in this case, an accessToken, refreshToken, and Google
-  //   profile), and invoke a callback with a user object.
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: "/auth/google/redirect",
-        passReqToCallback: true,
-      },
-      (accessToken, refreshToken, profile, done) => {
-        User.findOrCreate({ googleId: profile.id }, function(err, user) {
-          if (err) throw err;
-          console.log("User: ", user);
-          return done(err, user);
-        });
       }
     )
   );

@@ -4,6 +4,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const passport = require("passport");
 const nodemailer = require("nodemailer");
+const genID = require("../utils/genUniqueID");
 
 const User = require("../models/User");
 
@@ -76,6 +77,30 @@ router.post(
     res.status(200).send("");
   }
 );
+
+router.post("/googleLogin", (req, res) => {
+  const { email } = req.body;
+  User.findOne({ email: email }).then((user) => {
+    if (user) {
+      res.status(200).send({ registered: true, username: user.username });
+    } else {
+      res.status(200).send({ registered: false, username: null });
+    }
+  });
+});
+
+router.post("/googleRegister", (req, res) => {
+  const { email, username } = req.body;
+
+  const newUser = new User({ username, email });
+
+  newUser
+    .save()
+    .then(() => {
+      res.status(200).send("Successfully registered");
+    })
+    .catch((err) => console.log(err));
+});
 
 router.post("/islogged", (req, res) => {
   if (req.user) {
