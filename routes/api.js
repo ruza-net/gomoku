@@ -99,15 +99,20 @@ router.post("/googleLogin", (req, res) => {
 
 router.post("/googleRegister", (req, res) => {
   const { email, username } = req.body;
+  User.findOne({ username: username }).then((user) => {
+    if (user) {
+      res.status(401).send("Username taken");
+    } else {
+      const newUser = new User({ username, email });
 
-  const newUser = new User({ username, email });
-
-  newUser
-    .save()
-    .then(() => {
-      res.status(200).send("Successfully registered");
-    })
-    .catch((err) => console.log(err));
+      newUser
+        .save()
+        .then(() => {
+          res.status(200).send("Successfully registered");
+        })
+        .catch((err) => console.log(err));
+    }
+  });
 });
 
 router.post("/islogged", (req, res) => {
