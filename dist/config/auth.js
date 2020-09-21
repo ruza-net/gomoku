@@ -1,5 +1,6 @@
 "use strict";
-module.exports = {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.default = {
     ensureAuthenticated: function (req, res, next) {
         if (req.isAuthenticated()) {
             return next();

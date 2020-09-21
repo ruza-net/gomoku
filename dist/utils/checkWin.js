@@ -7,8 +7,15 @@
  * @param  {Number} round current round (0-255)
  * @return {(String|Boolean)} returns "won" | "tie" | false
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+var gameState;
+(function (gameState) {
+    gameState["WIN"] = "win";
+    gameState["TIE"] = "tie";
+    gameState["CONTINUE"] = "continue";
+})(gameState || (gameState = {}));
 function checkWin(gamePlan, yPos, xPos, round) {
-    const tile = round % 2 ? "1" : "2";
+    const tile = round % 2 ? 1 : 2;
     let horizont = 0;
     let vertical = 0;
     let diagonalR = 0;
@@ -48,18 +55,18 @@ function checkWin(gamePlan, yPos, xPos, round) {
             }
         }
         if (horizont >= 5 || vertical >= 5 || diagonalL >= 5 || diagonalR >= 5) {
-            return "win";
+            return gameState.WIN;
         }
     }
     if (horizont >= 5 || vertical >= 5 || diagonalL >= 5 || diagonalR >= 5) {
-        return "win";
+        return gameState.WIN;
     }
     else if (round === 225) {
-        return "tie";
+        return gameState.TIE;
     }
     else {
-        return false;
+        return gameState.CONTINUE;
     }
 }
-module.exports = checkWin;
+exports.default = checkWin;
 //# sourceMappingURL=checkWin.js.map

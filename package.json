@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
-    "dev": "nodemon",
+    "dev": "concurrently \"tsc -w\" \"nodemon dist/server.js\"",
     "build-src": "rimraf ./build && tsc"
   },
   "repository": {

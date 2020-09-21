@@ -1,13 +1,15 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * Generates random string of given length and compare it simple shallow object
  * @param {Object} compareObject object to compare to
  * @param {Number} length Length of output string
  * @returns {String}
  */
+// FIXME Add safety instead of empty string...
 function genID(compareObject, length) {
     if (length <= 0)
-        return false;
+        return "";
     for (let x = 0; x < 100; x++) {
         let randID = Math.random()
             .toString(36)
@@ -17,6 +19,7 @@ function genID(compareObject, length) {
             return randID;
         }
     }
+    return "";
 }
-module.exports = genID;
+exports.default = genID;
 //# sourceMappingURL=genUniqueID.js.map

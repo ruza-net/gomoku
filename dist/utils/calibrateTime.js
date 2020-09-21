@@ -1,10 +1,12 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * Calibrate local time to server time, called on click and after timeOut
  * @param {Object} games Object containing games of certain namespace/type
  * @param {Object} namespace Socket.io namespace
  * @param {String} roomID id of current room/game
  */
+// FIXME Games object
 function calibrateTime(games, roomID, namespace) {
     if (games[roomID]) {
         let currPlayerIx = (games[roomID].first + games[roomID].round) % 2;
@@ -24,5 +26,5 @@ function calibrateTime(games, roomID, namespace) {
         }
     }
 }
-module.exports = calibrateTime;
+exports.default = calibrateTime;
 //# sourceMappingURL=calibrateTime.js.map

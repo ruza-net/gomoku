@@ -1,7 +1,12 @@
 "use strict";
-const calibrateTime = require("./calibrateTime");
-const checkWin = require("./checkWin");
-const User = require("../models/User");
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.playerDisconnected = exports.gameClick = exports.calcAndUpdateELO = exports.startGame = exports.updateElo = exports.getUserElo = void 0;
+const calibrateTime_1 = __importDefault(require("./calibrateTime"));
+const checkWin_1 = __importDefault(require("./checkWin"));
+const User_1 = __importDefault(require("../models/User"));
 /**
  *
  * @param {Object} games existing games from certain gameType
@@ -28,6 +33,7 @@ function playerDisconnected(games, rated, namespace, socket) {
         }
     }
 }
+exports.playerDisconnected = playerDisconnected;
 /**
  *
  * @param {Object} games existing games from certain gameType
@@ -50,26 +56,32 @@ function gameClick(games, roomID, xPos, yPos, rated, namespace, socket) {
             namespace
                 .to(roomID)
                 .emit("click success", socket.id, round, xPos, yPos, game.times, game.players);
-            const gameBoardState = checkWin(game.gamePlan, yPos, xPos, round);
-            if (gameBoardState !== false) {
-                if (gameBoardState === "win") {
+            let gameState;
+            (function (gameState) {
+                gameState["WIN"] = "win";
+                gameState["TIE"] = "tie";
+                gameState["CONTINUE"] = "continue";
+            })(gameState || (gameState = {}));
+            const gameBoardState = checkWin_1.default(game.gamePlan, yPos, xPos, round);
+            if (gameBoardState !== gameState.CONTINUE) {
+                if (gameBoardState === gameState.WIN) {
                     if (rated) {
-                        calcAndUpdateELO(game, "win", socket, (eloDiff) => {
-                            namespace.to(roomID).emit("win", socket.id, eloDiff);
+                        calcAndUpdateELO(game, gameState.WIN, socket, (eloDiff) => {
+                            namespace.to(roomID).emit(gameState.WIN, socket.id, eloDiff);
                         });
                     }
                     else {
-                        namespace.to(roomID).emit("win", socket.id);
+                        namespace.to(roomID).emit(gameState.WIN, socket.id);
                     }
                 }
-                else if (gameBoardState === "tie") {
+                else if (gameBoardState === gameState.TIE) {
                     if (rated) {
-                        calcAndUpdateELO(game, "tie", socket, (eloDiff, tieGainerID) => {
-                            namespace.to(roomID).emit("tie", eloDiff, tieGainerID);
+                        calcAndUpdateELO(game, gameState.TIE, socket, (eloDiff, tieGainerID) => {
+                            namespace.to(roomID).emit(gameState.TIE, eloDiff, tieGainerID);
                         });
                     }
                     else {
-                        namespace.to(roomID).emit("tie");
+                        namespace.to(roomID).emit(gameState.TIE);
                     }
                 }
                 game.won = true;
@@ -79,7 +91,7 @@ function gameClick(games, roomID, xPos, yPos, rated, namespace, socket) {
                     game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
                     game.intervalLink = setInterval(() => {
                         if (game && game.won !== true) {
-                            let calibratedTime = calibrateTime(games, roomID, namespace);
+                            let calibratedTime = calibrateTime_1.default(games, roomID, namespace);
                             game.times[Math.abs(round - 1) % 2].timeLeft = calibratedTime;
                             game.times[Math.abs(round - 1) % 2].timeStamp = Date.now();
                         }
@@ -90,6 +102,7 @@ function gameClick(games, roomID, xPos, yPos, rated, namespace, socket) {
         }
     }
 }
+exports.gameClick = gameClick;
 /**
  * Calculates new ELO, callback emits to rooms with ELO diff, updatesELO in mongo
  * @param {Object} game
@@ -138,13 +151,14 @@ function calcAndUpdateELO(game, gameEnding, socket, callback) {
     updateElo(game.nicks[id1], finalELO1);
     updateElo(game.nicks[id2], finalELO2);
 }
+exports.calcAndUpdateELO = calcAndUpdateELO;
 /**
  * Finds game created in search (if not then send 404), picks random first player and sets time interval
  * @param {Object} games existing games from certain gameType
  * @param {String} roomID
  * @param {String} username
- * @param {Object} namespace socket.io namespace (e.g rankedNsp, quickNsp)
- * @param {Object} socket socket.io instance
+ * @param {Namespace} namespace socket.io namespace (e.g rankedNsp, quickNsp)
+ * @param {Socket} socket socket.io instance
  */
 function startGame(games, roomID, username, namespace, socket) {
     // Check if room exists, otherwise send to 404
@@ -168,7 +182,7 @@ function startGame(games, roomID, username, namespace, socket) {
                 game.intervalLink = setInterval(() => {
                     if (game) {
                         if (game.won !== true) {
-                            let calibratedTime = calibrateTime(games, roomID, namespace);
+                            let calibratedTime = calibrateTime_1.default(games, roomID, namespace);
                             game.times[rndN].timeLeft = calibratedTime;
                             game.times[rndN].timeStamp = Date.now();
                         }
@@ -183,27 +197,32 @@ function startGame(games, roomID, username, namespace, socket) {
         }
     }
 }
+exports.startGame = startGame;
 /**
  *
  * @param {String} username
  * @param {Number} newElo
  * @return {Boolean} true\false
  */
+// TODO Move to promise based function
 function updateElo(username, newElo) {
-    User.findOneAndUpdate({ username }, { elo: newElo })
+    User_1.default.findOneAndUpdate({ username }, { elo: newElo })
         .then(() => { })
         .catch((err) => {
         console.log(err);
     });
 }
+exports.updateElo = updateElo;
 /**
  *
  * @param {String} username
  * @param {Function} callback
  * @return {Number} Elo
  */
+// TODO Move to promise based functoin
+// TODO Mongoose user type Document <= any
 function getUserElo(username, callback) {
-    User.findOne({ username: username }).then((user) => {
+    User_1.default.findOne({ username: username }).then((user) => {
         if (user) {
             callback(null, user.elo);
         }
@@ -213,12 +232,5 @@ function getUserElo(username, callback) {
         }
     });
 }
-module.exports = {
-    getUserElo,
-    updateElo,
-    startGame,
-    calcAndUpdateELO,
-    gameClick,
-    playerDisconnected,
-};
+exports.getUserElo = getUserElo;
 //# sourceMappingURL=socketUtilFuncs.js.map

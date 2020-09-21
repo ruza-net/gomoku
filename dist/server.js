@@ -1,68 +1,72 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
 // ? IN DEVELOP LOAD CONFIG >> MONGODB KEY
 if (process.env.NODE_ENV !== "production") {
     require("dotenv/config");
 }
 // * IMPORTS
 // ? EXPRESS
-const express = require("express");
-const app = express();
-const compression = require("compression");
-const cors = require("cors");
+const express_1 = __importDefault(require("express"));
+const app = express_1.default();
+const compression_1 = __importDefault(require("compression"));
+const cors_1 = __importDefault(require("cors"));
 // ? MONGOOSE
-const mongoose = require("mongoose");
+const mongoose_1 = __importDefault(require("mongoose"));
 // ? PASSPORT and SESSION
-const passport = require("passport");
-const session = require("cookie-session");
+const passport_1 = __importDefault(require("passport"));
+// import session from "cookie-session";
 // ? SOCKET.IO + HTTP
-const socketIO = require("socket.io");
-const http = require("http");
+const socket_io_1 = __importDefault(require("socket.io"));
+const http_1 = __importDefault(require("http"));
 // ? PASSPORT CONFIG
-require("./config/passport")(passport);
+require("./config/passport")(passport_1.default);
 // ? EXPRESS BODYPARSER
-app.use(express.json()); // to support JSON-encoded bodies
-app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
-app.use(cors());
+app.use(express_1.default.json()); // to support JSON-encoded bodies
+app.use(express_1.default.urlencoded({ extended: true })); // to support URL-encoded bodies
+app.use(cors_1.default());
 // ? EXPRESS SESSION
-app.use(session({
-    keys: [process.env.COOKIE_SECRET],
-    resave: true,
-    saveUninitialized: true,
-    cookie: { expires: new Date(253402300000000) },
-}));
+// app.use(
+//   session({
+//     keys: [process.env.COOKIE_SECRET as string],
+//     expires: new Date(253402300000000),
+//   })
+// );
 // ? PASSPORT MIDDLEWARE
-app.use(passport.initialize());
-app.use(passport.session());
+app.use(passport_1.default.initialize());
+// app.use(passport.session());
 // ? ROUTES
-const apiRouter = require("./routes/api");
-const indexRouter = require("./routes/index");
-app.use("/api/", apiRouter);
-app.use("/", indexRouter);
-app.use(compression());
+const api_1 = require("./routes/api");
+const index_1 = require("./routes/index");
+app.use("/api/", api_1.apiRouter);
+app.use("/", index_1.indexRouter);
+app.use(compression_1.default());
 if (process.env.NODE_ENV === "production" || true) {
     //Static folder
-    app.use(express.static(__dirname + "/public/"));
+    app.use(express_1.default.static(__dirname + "/public/"));
     // Handle SPA
     app.get(/.*/, (req, res) => res.sendFile(__dirname + "/public/index.html"));
 }
 // ? MongoDB Constructor and URL parser deprecation warning fix
-mongoose.set("useUnifiedTopology", true);
-mongoose.set("useNewUrlParser", true);
-mongoose.set("useFindAndModify", false);
+mongoose_1.default.set("useUnifiedTopology", true);
+mongoose_1.default.set("useNewUrlParser", true);
+mongoose_1.default.set("useFindAndModify", false);
 // ? DB connection
-mongoose.connect(process.env.DB_CONNECTION);
-const db = mongoose.connection;
-db.on("error", (error) => console.error(error));
+mongoose_1.default.connect(process.env.DB_CONNECTION);
+const db = mongoose_1.default.connection;
+db.on("error", (err) => console.error(err));
 db.once("open", () => console.log("Connected to Mongoose"));
 const PORT = process.env.PORT || 3000;
-const server = http.Server(app);
+const server = new http_1.default.Server(app);
 // utils functions import
-const genID = require("./utils/genUniqueID");
-const gamePlan = require("./utils/genGamePlan");
-const { isNull } = require("util");
-const { getUserElo, startGame, gameClick, playerDisconnected, } = require("./utils/socketUtilFuncs");
-const io = socketIO(server);
+const genUniqueID_1 = __importDefault(require("./utils/genUniqueID"));
+const genMatrix_1 = __importDefault(require("./utils/genMatrix"));
+const socketUtilFuncs_1 = require("./utils/socketUtilFuncs");
+const io = socket_io_1.default(server);
 server.listen(PORT);
+// FIXME Fix the ranked que coercition and non-null assertion operators
 const gameMode = {
     quick: {
         que: [],
@@ -72,7 +76,6 @@ const gameMode = {
         games: {},
     },
     ranked: {
-        que: [],
         games: {},
     },
 };
@@ -87,11 +90,11 @@ let waitingRoomNsp = io.of("/waiting");
 searchNsp.on("connection", function (socket) {
     gameMode.quick.que.push(socket.id);
     if (gameMode.quick.que.length >= 2) {
-        let roomID = genID(gameMode.quick.games, 7);
+        let roomID = genUniqueID_1.default(gameMode.quick.games, 7);
         gameMode.quick.games[roomID] = {
             players: [],
             nicks: {},
-            first: null,
+            first: 0,
             round: 0,
             isTimed: true,
             intervalLink: null,
@@ -100,7 +103,7 @@ searchNsp.on("connection", function (socket) {
                 { timeLeft: 150, timeStamp: Date.now() },
             ],
             won: null,
-            gamePlan: gamePlan(),
+            gamePlan: genMatrix_1.default(15),
         };
         searchNsp.to(gameMode.quick.que[0]).emit("gameCreated", roomID);
         searchNsp.to(gameMode.quick.que[1]).emit("gameCreated", roomID);
@@ -116,24 +119,24 @@ searchNsp.on("connection", function (socket) {
 quickNsp.on("connection", function (socket) {
     let games = gameMode.quick.games;
     socket.on("gameJoined", function (roomID, username) {
-        startGame(games, roomID, username, quickNsp, socket);
+        socketUtilFuncs_1.startGame(games, roomID, username, quickNsp, socket);
     });
     socket.on("game click", function (roomID, xPos, yPos) {
-        gameClick(games, roomID, xPos, yPos, false, quickNsp, socket);
+        socketUtilFuncs_1.gameClick(games, roomID, xPos, yPos, false, quickNsp, socket);
     });
     socket.on("disconnect", function () {
-        playerDisconnected(games, false, quickNsp, socket);
+        socketUtilFuncs_1.playerDisconnected(games, false, quickNsp, socket);
     });
 });
 // Private
 waitingRoomNsp.on("connection", function (socket, username) {
     socket.on("createRoom", function (timeInMinutes) {
-        let roomID = genID(gameMode.private.games, 4);
-        const isTimed = !isNull(timeInMinutes);
+        let roomID = genUniqueID_1.default(gameMode.private.games, 4);
+        const isTimed = timeInMinutes !== null;
         gameMode.private.games[roomID] = {
             players: [],
             nicks: {},
-            first: null,
+            first: 0,
             round: 0,
             isTimed: isTimed,
             times: [
@@ -141,7 +144,7 @@ waitingRoomNsp.on("connection", function (socket, username) {
                 { timeLeft: timeInMinutes * 60, timeStamp: Date.now() },
             ],
             won: null,
-            gamePlan: gamePlan(),
+            gamePlan: genMatrix_1.default(15),
         };
         socket.join(roomID);
         socket.emit("roomGenerated", roomID);
@@ -170,25 +173,25 @@ waitingRoomNsp.on("connection", function (socket, username) {
 });
 privateGameNsp.on("connection", function (socket) {
     socket.on("gameJoined", function (roomID, username) {
-        startGame(gameMode.private.games, roomID, username, privateGameNsp, socket);
+        socketUtilFuncs_1.startGame(gameMode.private.games, roomID, username, privateGameNsp, socket);
     });
     socket.on("game click", function (roomID, xPos, yPos) {
-        gameClick(gameMode.private.games, roomID, xPos, yPos, false, privateGameNsp, socket);
+        socketUtilFuncs_1.gameClick(gameMode.private.games, roomID, xPos, yPos, false, privateGameNsp, socket);
     });
     socket.on("disconnect", function () {
-        playerDisconnected(gameMode.private.games, false, privateGameNsp, socket);
+        socketUtilFuncs_1.playerDisconnected(gameMode.private.games, false, privateGameNsp, socket);
     });
 });
 // Ranked
 rankedSearchNsp.on("connection", function (socket) {
     socket.on("beginSearch", function (username) {
         // Assign Elo
-        getUserElo(username, (err, elo) => {
+        socketUtilFuncs_1.getUserElo(username, (err, elo) => {
             if (err)
                 console.log(err);
             gameMode.ranked.que.push({ id: socket.id, elo, username });
             if (gameMode.ranked.que.length >= 2) {
-                let roomID = genID(gameMode.ranked.games, 7);
+                let roomID = genUniqueID_1.default(gameMode.ranked.games, 7);
                 gameMode.ranked.games[roomID] = {
                     players: [],
                     nicks: {},
@@ -196,7 +199,7 @@ rankedSearchNsp.on("connection", function (socket) {
                         [gameMode.ranked.que[0].username]: gameMode.ranked.que[0].elo,
                         [gameMode.ranked.que[1].username]: gameMode.ranked.que[1].elo,
                     },
-                    first: null,
+                    first: 0,
                     round: 0,
                     intervalLink: null,
                     isTimed: true,
@@ -205,7 +208,7 @@ rankedSearchNsp.on("connection", function (socket) {
                         { timeLeft: 150, timeStamp: Date.now() },
                     ],
                     won: null,
-                    gamePlan: gamePlan(),
+                    gamePlan: genMatrix_1.default(15),
                 };
                 rankedSearchNsp
                     .to(gameMode.ranked.que[0].id)
@@ -229,13 +232,13 @@ rankedSearchNsp.on("connection", function (socket) {
 rankedNsp.on("connection", function (socket) {
     let games = gameMode.ranked.games;
     socket.on("gameJoined", function (roomID, username) {
-        startGame(games, roomID, username, rankedNsp, socket);
+        socketUtilFuncs_1.startGame(games, roomID, username, rankedNsp, socket);
     });
     socket.on("game click", function (roomID, xPos, yPos) {
-        gameClick(games, roomID, xPos, yPos, true, rankedNsp, socket);
+        socketUtilFuncs_1.gameClick(games, roomID, xPos, yPos, true, rankedNsp, socket);
     });
     socket.on("disconnect", function () {
-        playerDisconnected(games, true, rankedNsp, socket);
+        socketUtilFuncs_1.playerDisconnected(games, true, rankedNsp, socket);
     });
 });
 //# sourceMappingURL=server.js.map

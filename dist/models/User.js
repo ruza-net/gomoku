@@ -1,6 +1,17 @@
 "use strict";
-const mongoose = require("mongoose");
-const UserSchema = new mongoose.Schema({
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UserSchema = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
+var gameBoard;
+(function (gameBoard) {
+    gameBoard["NORMAL"] = "normal";
+    gameBoard["TRADITIONAL"] = "traditional";
+    gameBoard["MODERN"] = "modern";
+})(gameBoard || (gameBoard = {}));
+exports.UserSchema = new mongoose_1.default.Schema({
     username: {
         type: String,
         required: true,
@@ -10,7 +21,6 @@ const UserSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        default: "test@mail.com",
     },
     isVerified: {
         type: Boolean,
@@ -18,15 +28,20 @@ const UserSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: false,
     },
     date: {
         type: Date,
         default: Date.now,
     },
     colors: {
-        type: String,
-        default: "#ff006e,#3a86ff,#e70064",
+        enemyColor: {
+            type: String,
+            default: "#ff2079",
+        },
+        playerColor: {
+            type: String,
+            default: "#00b3fe",
+        },
     },
     gameBoard: {
         type: String,
@@ -36,11 +51,22 @@ const UserSchema = new mongoose.Schema({
         type: Number,
         default: 1000,
     },
-    admin: {
-        type: Boolean,
-        default: false,
+    totalRankedGames: {
+        type: Number,
+        default: 0,
     },
+    eloHistory: [
+        {
+            timestamp: {
+                type: Date,
+                default: Date.now(),
+            },
+            currElo: {
+                type: Number,
+            },
+        },
+    ],
 });
-const User = mongoose.model("User", UserSchema);
-module.exports = User;
+const User = mongoose_1.default.model("User", exports.UserSchema);
+exports.default = User;
 //# sourceMappingURL=User.js.map

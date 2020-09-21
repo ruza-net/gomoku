@@ -10,5 +10,7 @@
     "strict": true,
     "allowJs": true
   },
+  "include": ["src"],
+  "compileOnSave": true,
   "lib": ["es2015"]
 }
