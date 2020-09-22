@@ -139,6 +139,7 @@ waitingRoomNsp.on("connection", function (socket, username) {
             first: 0,
             round: 0,
             isTimed: isTimed,
+            intervalLink: null,
             times: [
                 { timeLeft: timeInMinutes * 60, timeStamp: Date.now() },
                 { timeLeft: timeInMinutes * 60, timeStamp: Date.now() },

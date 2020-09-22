@@ -25,6 +25,8 @@ function calibrateTime(games, roomID, namespace) {
             return restSeconds - deltaTime / 1000;
         }
     }
+    throw new Error("Calibrate time has failed");
+    return 0;
 }
 exports.default = calibrateTime;
 //# sourceMappingURL=calibrateTime.js.map

@@ -7,7 +7,7 @@ const passport_local_1 = __importDefault(require("passport-local"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 // Load User Model
 const User_1 = __importDefault(require("../models/User"));
-function default_1(passport) {
+module.exports = function (passport) {
     passport.use(new passport_local_1.default.Strategy({
         usernameField: "email",
         passwordField: "password",
@@ -42,6 +42,5 @@ function default_1(passport) {
                 console.log(err);
         });
     });
-}
-exports.default = default_1;
+};
 //# sourceMappingURL=passport.js.map

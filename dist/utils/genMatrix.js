@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
  */
 function gen(n) {
     if (n < 0)
-        return undefined;
+        return [];
     let matrix = [];
     for (let x = 0; x < n; x++) {
         matrix.push([]);

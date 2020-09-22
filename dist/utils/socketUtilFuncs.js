@@ -52,7 +52,7 @@ function gameClick(games, roomID, xPos, yPos, rated, namespace, socket) {
             game.won === false &&
             game.gamePlan[xPos][yPos] === 0) {
             clearInterval(game.intervalLink);
-            game.gamePlan[xPos][yPos] = round % 2 ? "1" : "2";
+            game.gamePlan[xPos][yPos] = round % 2 ? 1 : 2;
             namespace
                 .to(roomID)
                 .emit("click success", socket.id, round, xPos, yPos, game.times, game.players);
